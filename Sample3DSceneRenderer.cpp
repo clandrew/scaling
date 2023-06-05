@@ -280,7 +280,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 }
 
 // Initializes view parameters when the window size changes.
-void Sample3DSceneRenderer::CreateWindowSizeDependentResources()
+void Sample3DSceneRenderer::CreateTargetSizeDependentResources()
 {
 	DX::SizeU outputSize = m_deviceResources->GetOutputSize();
 	float aspectRatio = static_cast<float>(outputSize.Width) / static_cast<float>(outputSize.Height);

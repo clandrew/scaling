@@ -13,7 +13,7 @@ namespace scaling
 		Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceResources>& deviceResources);
 		~Sample3DSceneRenderer();
 		void CreateDeviceDependentResources();
-		void CreateWindowSizeDependentResources();
+		void CreateTargetSizeDependentResources();
 		void Update(DX::StepTimer const& timer);
 		bool Render();
 

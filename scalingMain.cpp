@@ -55,8 +55,7 @@ bool scalingMain::Render()
 // Updates application state when the window's size changes (e.g. device orientation change)
 void scalingMain::OnWindowSizeChanged()
 {
-	// TODO: Replace this with the size-dependent initialization of your app's content.
-	m_sceneRenderer->CreateWindowSizeDependentResources();
+	m_sceneRenderer->CreateTargetSizeDependentResources();
 }
 
 // Notifies renderers that device resources need to be released.
