@@ -23,7 +23,7 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
 	CreateDeviceDependentResources();
-	CreateWindowSizeDependentResources();
+	CreateTargetSizeDependentResources();
 }
 
 Sample3DSceneRenderer::~Sample3DSceneRenderer()
@@ -282,9 +282,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 // Initializes view parameters when the window size changes.
 void Sample3DSceneRenderer::CreateTargetSizeDependentResources()
 {
-	DX::SizeU outputSize = m_deviceResources->GetOutputSize();
-	float aspectRatio = static_cast<float>(outputSize.Width) / static_cast<float>(outputSize.Height);
-	float fovAngleY = 70.0f * XM_PI / 180.0f;
 
 	D3D12_VIEWPORT viewport = m_deviceResources->GetScreenViewport();
 	m_scissorRect = { 0, 0, static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};

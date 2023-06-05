@@ -31,13 +31,6 @@ namespace DX
 		void Present();
 		void WaitForGpu();
 
-		// The size of the render target, in pixels.
-		SizeU						GetOutputSize() const				{ return m_outputSize; }
-
-		// The size of the render target, in dips.
-		SizeF						GetLogicalSize() const				{ return m_logicalSize; }
-
-		float						GetDpi() const						{ return m_effectiveDpi; }
 		bool						IsDeviceRemoved() const				{ return m_deviceRemoved; }
 
 		// D3D Accessors.
@@ -49,7 +42,10 @@ namespace DX
 		ID3D12CommandAllocator*		GetCommandAllocator() const			{ return m_commandAllocators[m_currentFrame].Get(); }
 		DXGI_FORMAT					GetBackBufferFormat() const			{ return m_backBufferFormat; }
 		DXGI_FORMAT					GetDepthBufferFormat() const		{ return m_depthBufferFormat; }
-		D3D12_VIEWPORT				GetScreenViewport() const			{ return m_screenViewport; }
+
+		D3D12_VIEWPORT				GetPass1Viewport() const			{ return m_pass1Viewport; }
+		D3D12_VIEWPORT				GetPass2Viewport() const			{ return m_pass2Viewport; }
+		
 		DirectX::XMFLOAT4X4			GetOrientationTransform3D() const	{ return m_orientationTransform3D; }
 		UINT						GetCurrentFrameIndex() const		{ return m_currentFrame; }
 
@@ -65,8 +61,7 @@ namespace DX
 	private:
 		void CreateDeviceIndependentResources();
 		void CreateDeviceResources();
-		void CreateWindowSizeDependentResources();
-		void UpdateRenderTargetSize();
+		void CreateTargetSizeDependentResources();
 		void MoveToNextFrame();
 		void GetHardwareAdapter(IDXGIAdapter1** ppAdapter);
 
@@ -84,7 +79,10 @@ namespace DX
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>	m_commandAllocators[c_frameCount];
 		DXGI_FORMAT										m_backBufferFormat;
 		DXGI_FORMAT										m_depthBufferFormat;
-		D3D12_VIEWPORT									m_screenViewport;
+
+		D3D12_VIEWPORT									m_pass1Viewport;
+		D3D12_VIEWPORT									m_pass2Viewport;
+		
 		UINT											m_rtvDescriptorSize;
 		bool											m_deviceRemoved;
 
@@ -95,15 +93,6 @@ namespace DX
 
 		// Cached reference to the Window.
 		HWND											m_window;
-
-		// Cached device properties.
-		SizeU											m_d3dRenderTargetSize;
-		SizeU											m_outputSize;
-		SizeF											m_logicalSize;
-		float											m_dpi;
-
-		// This is the DPI that will be reported back to the app. It takes into account whether the app supports high resolution screens or not.
-		float											m_effectiveDpi;
 
 		// Transforms used for display orientation.
 		DirectX::XMFLOAT4X4								m_orientationTransform3D;

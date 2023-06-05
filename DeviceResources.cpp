@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "DeviceResources.h"
 #include "DirectXHelper.h"
+#include "scaling.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -61,17 +62,13 @@ namespace ScreenRotation
 // Constructor for DeviceResources.
 DX::DeviceResources::DeviceResources(DXGI_FORMAT backBufferFormat, DXGI_FORMAT depthBufferFormat) :
 	m_currentFrame(0),
-	m_screenViewport(),
+	m_pass1Viewport(),
+	m_pass2Viewport(),
 	m_rtvDescriptorSize(0),
 	m_fenceEvent(0),
 	m_backBufferFormat(backBufferFormat),
 	m_depthBufferFormat(depthBufferFormat),
 	m_fenceValues{},
-	m_d3dRenderTargetSize(),
-	m_outputSize(),
-	m_logicalSize(),
-	m_dpi(96.0f),
-	m_effectiveDpi(-1.0f),
 	m_deviceRemoved(false)
 {
 	CreateDeviceIndependentResources();
@@ -169,7 +166,7 @@ void DX::DeviceResources::CreateDeviceResources()
 }
 
 // These resources need to be recreated every time the window size is changed.
-void DX::DeviceResources::CreateWindowSizeDependentResources()
+void DX::DeviceResources::CreateTargetSizeDependentResources()
 {
 	// Wait until all previous GPU work is complete.
 	WaitForGpu();
@@ -181,22 +178,8 @@ void DX::DeviceResources::CreateWindowSizeDependentResources()
 		m_fenceValues[n] = m_fenceValues[m_currentFrame];
 	}
 
-	RECT rect{};
-	GetClientRect(m_window, &rect);
-	m_logicalSize.Width = static_cast<float>(rect.right - rect.left);
-	m_logicalSize.Height = static_cast<float>(rect.bottom - rect.top);
-
-	UpdateRenderTargetSize();
-
-	// The width and height of the swap chain must be based on the window's
-	// natively-oriented width and height. If the window is not in the native
-	// orientation, the dimensions must be reversed.
-	DXGI_MODE_ROTATION displayRotation = DXGI_MODE_ROTATION_UNSPECIFIED;
-	m_d3dRenderTargetSize.Width = m_outputSize.Width;
-	m_d3dRenderTargetSize.Height = m_outputSize.Height;
-
-	UINT backBufferWidth = lround(m_d3dRenderTargetSize.Width);
-	UINT backBufferHeight = lround(m_d3dRenderTargetSize.Height);
+	UINT backBufferWidth = lround(g_scaling_destWidth);
+	UINT backBufferHeight = lround(g_scaling_destHeight);
 
 	if (m_swapChain != nullptr)
 	{
@@ -293,39 +276,8 @@ void DX::DeviceResources::CreateWindowSizeDependentResources()
 		m_d3dDevice->CreateDepthStencilView(m_depthStencil.Get(), &dsvDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 
-	// Set the 3D rendering viewport to target the entire window.
-	m_screenViewport = { 0.0f, 0.0f, static_cast<float>(m_d3dRenderTargetSize.Width), static_cast<float>(m_d3dRenderTargetSize.Height), 0.0f, 1.0f };
-}
-
-// Determine the dimensions of the render target and whether it will be scaled down.
-void DX::DeviceResources::UpdateRenderTargetSize()
-{
-	m_effectiveDpi = m_dpi;
-
-	// To improve battery life on high resolution devices, render to a smaller render target
-	// and allow the GPU to scale the output when it is presented.
-	if (!DisplayMetrics::SupportHighResolutions && m_dpi > DisplayMetrics::DpiThreshold)
-	{
-		float width = DX::ConvertDipsToPixels(m_logicalSize.Width, m_dpi);
-		float height = DX::ConvertDipsToPixels(m_logicalSize.Height, m_dpi);
-
-		// When the device is in portrait orientation, height > width. Compare the
-		// larger dimension against the width threshold and the smaller dimension
-		// against the height threshold.
-		if (max(width, height) > DisplayMetrics::WidthThreshold && min(width, height) > DisplayMetrics::HeightThreshold)
-		{
-			// To scale the app we change the effective DPI. Logical size does not change.
-			m_effectiveDpi /= 2.0f;
-		}
-	}
-
-	// Calculate the necessary render target size in pixels.
-	m_outputSize.Width = static_cast<unsigned int>(DX::ConvertDipsToPixels(m_logicalSize.Width, m_effectiveDpi));
-	m_outputSize.Height = static_cast<unsigned int>(DX::ConvertDipsToPixels(m_logicalSize.Height, m_effectiveDpi));
-
-	// Prevent zero size DirectX content from being created.
-	m_outputSize.Width = max(m_outputSize.Width, 1);
-	m_outputSize.Height = max(m_outputSize.Height, 1);
+	m_pass1Viewport = { 0.0f, 0.0f, static_cast<float>(g_scaling_sourceWidth), static_cast<float>(g_scaling_sourceHeight), 0.0f, 1.0f };
+	m_pass2Viewport = { 0.0f, 0.0f, static_cast<float>(g_scaling_destWidth), static_cast<float>(g_scaling_destHeight), 0.0f, 1.0f };
 }
 
 // This method is called when the CoreWindow is created (or re-created).
@@ -333,18 +285,13 @@ void DX::DeviceResources::SetWindow(HWND hwnd)
 {
 	m_window = hwnd;
 
-	CreateWindowSizeDependentResources();
+	// Todo: re-create resources here if needed
 }
 
 // This method is called in the event handler for the SizeChanged event.
 void DX::DeviceResources::SetLogicalSize(SizeF logicalSize)
 {
-	if (static_cast<int>(m_logicalSize.Width) != static_cast<int>(logicalSize.Width) ||
-		static_cast<int>(m_logicalSize.Height) != static_cast<int>(logicalSize.Height))
-	{
-		m_logicalSize = logicalSize;
-		CreateWindowSizeDependentResources();
-	}
+	// Todo: re-create resources here if needed
 }
 
 // This method is called in the event handler for the DisplayContentsInvalidated event.
