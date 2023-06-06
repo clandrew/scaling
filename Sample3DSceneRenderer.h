@@ -32,18 +32,22 @@ namespace scaling
 		Microsoft::WRL::ComPtr<ID3D12RootSignature>			m_rootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pipelineState;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		m_cbvHeap;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				m_vertexBuffer;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				m_indexBuffer;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_constantBuffer;
 		ModelViewProjectionConstantBuffer					m_constantBufferData;
 		UINT8*												m_mappedConstantBuffer;
 		UINT												m_cbvDescriptorSize;
 
 		D3D12_RECT											m_pass1ScissorRect;
-		D3D12_RECT											m_pass2ScissorRect;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_spinningCubeVertexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_spinningCubeIndexBuffer;
+		D3D12_VERTEX_BUFFER_VIEW							m_spinningCubeVertexBufferView;
+		D3D12_INDEX_BUFFER_VIEW								m_spinningCubeIndexBufferView;
 
-		D3D12_VERTEX_BUFFER_VIEW							m_vertexBufferView;
-		D3D12_INDEX_BUFFER_VIEW								m_indexBufferView;
+		D3D12_RECT											m_pass2ScissorRect;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadVertexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadIndexBuffer;
+		D3D12_VERTEX_BUFFER_VIEW							m_texturedQuadVertexBufferView;
+		D3D12_INDEX_BUFFER_VIEW								m_texturedQuadIndexBufferView;
 
 		// Variables used with the rendering loop.
 		bool	m_loadingComplete;

@@ -132,7 +132,7 @@ void DX::DeviceResources::CreateDeviceResources()
 
 	// Create descriptor heaps for render target views and depth stencil views.
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-	rtvHeapDesc.NumDescriptors = c_frameCount;
+	rtvHeapDesc.NumDescriptors = c_frameCount + 1; // One for the intermediate, and then one for each swap chain target
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	DX::ThrowIfFailed(m_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
@@ -174,7 +174,7 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 	// Clear the previous window size specific content and update the tracked fence values.
 	for (UINT n = 0; n < c_frameCount; n++)
 	{
-		m_renderTargets[n] = nullptr;
+		m_swapChainRenderTargets[n] = nullptr;
 		m_fenceValues[n] = m_fenceValues[m_currentFrame];
 	}
 
@@ -236,14 +236,14 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 		for (UINT n = 0; n < c_frameCount; n++)
 		{
-			DX::ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-			m_d3dDevice->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvDescriptor);
+			DX::ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_swapChainRenderTargets[n])));
+			m_d3dDevice->CreateRenderTargetView(m_swapChainRenderTargets[n].Get(), nullptr, rtvDescriptor);
 			rtvDescriptor.Offset(m_rtvDescriptorSize);
 
 			WCHAR name[25];
-			if (swprintf_s(name, L"m_renderTargets[%u]", n) > 0)
+			if (swprintf_s(name, L"m_swapChainRenderTargets[%u]", n) > 0)
 			{
-				DX::SetName(m_renderTargets[n].Get(), name);
+				DX::SetName(m_swapChainRenderTargets[n].Get(), name);
 			}
 		}
 	}

@@ -88,7 +88,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pipelineState)));
 	};
 
-	// Create and upload cube geometry resources to the GPU.
+	// Create and upload cube and quad geometry resources to the GPU.
 	{
 		auto d3dDevice = m_deviceResources->GetD3DDevice();
 
@@ -96,120 +96,211 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
         NAME_D3D12_OBJECT(m_commandList);
 
-		// Cube vertices. Each vertex has a position and a color.
-		VertexPositionColor cubeVertices[] =
-		{
-			{ XMFLOAT3(-0.5f, -0.5f, -0.5f), XMFLOAT3(0.0f, 0.0f, 0.0f) },
-			{ XMFLOAT3(-0.5f, -0.5f,  0.5f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-			{ XMFLOAT3(-0.5f,  0.5f, -0.5f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-			{ XMFLOAT3(-0.5f,  0.5f,  0.5f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
-			{ XMFLOAT3(0.5f, -0.5f, -0.5f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-			{ XMFLOAT3(0.5f, -0.5f,  0.5f), XMFLOAT3(1.0f, 0.0f, 1.0f) },
-			{ XMFLOAT3(0.5f,  0.5f, -0.5f), XMFLOAT3(1.0f, 1.0f, 0.0f) },
-			{ XMFLOAT3(0.5f,  0.5f,  0.5f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
-		};
-
-		const UINT vertexBufferSize = sizeof(cubeVertices);
-
-		// Create the vertex buffer resource in the GPU's default heap and copy vertex data into it using the upload heap.
-		// The upload resource must not be released until after the GPU has finished using it.
-		Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferUpload;
-
-		CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
-		CD3DX12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&defaultHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&m_vertexBuffer)));
-
 		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&vertexBufferUpload)));
+		CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 
-        NAME_D3D12_OBJECT(m_vertexBuffer);
+		// Do not release these until the upload is finished
+		Microsoft::WRL::ComPtr<ID3D12Resource> spinningCubeVertexBufferUpload;
+		Microsoft::WRL::ComPtr<ID3D12Resource> spinningCubeIndexBufferUpload;
+		Microsoft::WRL::ComPtr<ID3D12Resource> texturedQuadVertexBufferUpload;
+		Microsoft::WRL::ComPtr<ID3D12Resource> texturedQuadIndexBufferUpload;
 
-		// Upload the vertex buffer to the GPU.
+		// Cube
 		{
-			D3D12_SUBRESOURCE_DATA vertexData = {};
-			vertexData.pData = reinterpret_cast<BYTE*>(cubeVertices);
-			vertexData.RowPitch = vertexBufferSize;
-			vertexData.SlicePitch = vertexData.RowPitch;
+			// Cube vertices. Each vertex has a position and a color.
+			VertexPositionColor cubeVertices[] =
+			{
+				{ XMFLOAT3(-0.5f, -0.5f, -0.5f), XMFLOAT3(0.0f, 0.0f, 0.0f) },
+				{ XMFLOAT3(-0.5f, -0.5f,  0.5f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
+				{ XMFLOAT3(-0.5f,  0.5f, -0.5f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+				{ XMFLOAT3(-0.5f,  0.5f,  0.5f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
+				{ XMFLOAT3(0.5f, -0.5f, -0.5f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
+				{ XMFLOAT3(0.5f, -0.5f,  0.5f), XMFLOAT3(1.0f, 0.0f, 1.0f) },
+				{ XMFLOAT3(0.5f,  0.5f, -0.5f), XMFLOAT3(1.0f, 1.0f, 0.0f) },
+				{ XMFLOAT3(0.5f,  0.5f,  0.5f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
+			};
+			const UINT spinningCubeVertexBufferSize = sizeof(cubeVertices);
 
-			UpdateSubresources(m_commandList.Get(), m_vertexBuffer.Get(), vertexBufferUpload.Get(), 0, 0, 1, &vertexData);
+			CD3DX12_RESOURCE_DESC spinningCubeVertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(spinningCubeVertexBufferSize);
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&defaultHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&spinningCubeVertexBufferDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&m_spinningCubeVertexBuffer)));
+			NAME_D3D12_OBJECT(m_spinningCubeVertexBuffer);
 
-			CD3DX12_RESOURCE_BARRIER vertexBufferResourceBarrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-			m_commandList->ResourceBarrier(1, &vertexBufferResourceBarrier);
-		}
+			// Create vertex/index buffer views.
+			m_spinningCubeVertexBufferView.BufferLocation = m_spinningCubeVertexBuffer->GetGPUVirtualAddress();
+			m_spinningCubeVertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
+			m_spinningCubeVertexBufferView.SizeInBytes = sizeof(cubeVertices);
 
-		// Load mesh indices. Each trio of indices represents a triangle to be rendered on the screen.
-		// For example: 0,2,1 means that the vertices with indexes 0, 2 and 1 from the vertex buffer compose the
-		// first triangle of this mesh.
-		unsigned short cubeIndices[] =
-		{
-			0, 2, 1, // -x
-			1, 2, 3,
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&uploadHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&spinningCubeVertexBufferDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&spinningCubeVertexBufferUpload)));
 
-			4, 5, 6, // +x
-			5, 7, 6,
+			D3D12_SUBRESOURCE_DATA spinningCubeVertexData = {};
+			spinningCubeVertexData.pData = reinterpret_cast<BYTE*>(cubeVertices);
+			spinningCubeVertexData.RowPitch = spinningCubeVertexBufferSize;
+			spinningCubeVertexData.SlicePitch = spinningCubeVertexData.RowPitch;
 
-			0, 1, 5, // -y
-			0, 5, 4,
+			UpdateSubresources(m_commandList.Get(), m_spinningCubeVertexBuffer.Get(), spinningCubeVertexBufferUpload.Get(), 0, 0, 1, &spinningCubeVertexData);
 
-			2, 6, 7, // +y
-			2, 7, 3,
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_spinningCubeVertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+			m_commandList->ResourceBarrier(1, &barrier);
 
-			0, 4, 6, // -z
-			0, 6, 2,
+			// Load mesh indices. Each trio of indices represents a triangle to be rendered on the screen.
+			// For example: 0,2,1 means that the vertices with indexes 0, 2 and 1 from the vertex buffer compose the
+			// first triangle of this mesh.
+			unsigned short cubeIndices[] =
+			{
+				0, 2, 1, // -x
+				1, 2, 3,
 
-			1, 3, 7, // +z
-			1, 7, 5,
-		};
+				4, 5, 6, // +x
+				5, 7, 6,
 
-		const UINT indexBufferSize = sizeof(cubeIndices);
+				0, 1, 5, // -y
+				0, 5, 4,
 
-		// Create the index buffer resource in the GPU's default heap and copy index data into it using the upload heap.
-		// The upload resource must not be released until after the GPU has finished using it.
-		Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferUpload;
+				2, 6, 7, // +y
+				2, 7, 3,
 
-		CD3DX12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&defaultHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&m_indexBuffer)));
+				0, 4, 6, // -z
+				0, 6, 2,
 
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&indexBufferUpload)));
+				1, 3, 7, // +z
+				1, 7, 5,
+			};
 
-		NAME_D3D12_OBJECT(m_indexBuffer);
+			const UINT spinningCubeIndexBufferSize = sizeof(cubeIndices);
 
-		// Upload the index buffer to the GPU.
-		{
+			CD3DX12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(spinningCubeIndexBufferSize);
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&defaultHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&indexBufferDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&m_spinningCubeIndexBuffer)));
+
+			m_spinningCubeIndexBufferView.BufferLocation = m_spinningCubeIndexBuffer->GetGPUVirtualAddress();
+			m_spinningCubeIndexBufferView.SizeInBytes = sizeof(cubeIndices);
+			m_spinningCubeIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
+
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&uploadHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&indexBufferDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&spinningCubeIndexBufferUpload)));
+
+			NAME_D3D12_OBJECT(m_spinningCubeIndexBuffer);
+
 			D3D12_SUBRESOURCE_DATA indexData = {};
 			indexData.pData = reinterpret_cast<BYTE*>(cubeIndices);
-			indexData.RowPitch = indexBufferSize;
+			indexData.RowPitch = spinningCubeIndexBufferSize;
 			indexData.SlicePitch = indexData.RowPitch;
 
-			UpdateSubresources(m_commandList.Get(), m_indexBuffer.Get(), indexBufferUpload.Get(), 0, 0, 1, &indexData);
+			UpdateSubresources(m_commandList.Get(), m_spinningCubeIndexBuffer.Get(), spinningCubeIndexBufferUpload.Get(), 0, 0, 1, &indexData);
 
 			CD3DX12_RESOURCE_BARRIER indexBufferResourceBarrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
+				CD3DX12_RESOURCE_BARRIER::Transition(m_spinningCubeIndexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
+			m_commandList->ResourceBarrier(1, &indexBufferResourceBarrier);
+		}
+
+		// Quad
+		{
+			VertexPositionColor quadVertices[] =
+			{
+				{ XMFLOAT3(-1, -1, 1), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // Top left
+				{ XMFLOAT3(1,  -1, 1), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // Top right
+				{ XMFLOAT3(-1,  1, 1), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // Bottom left
+				{ XMFLOAT3(1,   1, 1), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // Bottom right
+			};
+			const UINT quadVertexBufferSize = sizeof(quadVertices);
+
+			CD3DX12_RESOURCE_DESC quadVertexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(quadVertexBufferSize);
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&defaultHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&quadVertexBufferDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&m_texturedQuadVertexBuffer)));
+			NAME_D3D12_OBJECT(m_texturedQuadVertexBuffer);
+
+			// Create vertex/index buffer views.
+			m_texturedQuadVertexBufferView.BufferLocation = m_texturedQuadVertexBuffer->GetGPUVirtualAddress();
+			m_texturedQuadVertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
+			m_texturedQuadVertexBufferView.SizeInBytes = sizeof(quadVertices);
+
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&uploadHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&quadVertexBufferDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&texturedQuadVertexBufferUpload)));
+
+			D3D12_SUBRESOURCE_DATA quadVertexData = {};
+			quadVertexData.pData = reinterpret_cast<BYTE*>(quadVertices);
+			quadVertexData.RowPitch = quadVertexBufferSize;
+			quadVertexData.SlicePitch = quadVertexData.RowPitch;
+
+			UpdateSubresources(m_commandList.Get(), m_texturedQuadVertexBuffer.Get(), texturedQuadVertexBufferUpload.Get(), 0, 0, 1, &quadVertexData);
+
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_texturedQuadVertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+			m_commandList->ResourceBarrier(1, &barrier);
+
+			unsigned short quadIndices[] =
+			{
+				0, 2, 1,
+				1, 2, 3,
+			};
+
+			const UINT quadIndexBufferSize = sizeof(quadIndices);
+
+			CD3DX12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(quadIndexBufferSize);
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&defaultHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&indexBufferDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&m_texturedQuadIndexBuffer)));
+
+			m_texturedQuadIndexBufferView.BufferLocation = m_texturedQuadIndexBuffer->GetGPUVirtualAddress();
+			m_texturedQuadIndexBufferView.SizeInBytes = sizeof(quadIndices);
+			m_texturedQuadIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
+
+			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+				&uploadHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				&indexBufferDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&texturedQuadIndexBufferUpload)));
+
+			NAME_D3D12_OBJECT(m_texturedQuadIndexBuffer);
+
+			D3D12_SUBRESOURCE_DATA indexData = {};
+			indexData.pData = reinterpret_cast<BYTE*>(quadIndices);
+			indexData.RowPitch = quadIndexBufferSize;
+			indexData.SlicePitch = indexData.RowPitch;
+
+			UpdateSubresources(m_commandList.Get(), m_texturedQuadIndexBuffer.Get(), texturedQuadIndexBufferUpload.Get(), 0, 0, 1, &indexData);
+
+			CD3DX12_RESOURCE_BARRIER indexBufferResourceBarrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_texturedQuadIndexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 			m_commandList->ResourceBarrier(1, &indexBufferResourceBarrier);
 		}
 
@@ -262,15 +353,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		DX::ThrowIfFailed(m_commandList->Close());
 		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-		// Create vertex/index buffer views.
-		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-		m_vertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
-		m_vertexBufferView.SizeInBytes = sizeof(cubeVertices);
-
-		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-		m_indexBufferView.SizeInBytes = sizeof(cubeIndices);
-		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
 		m_deviceResources->WaitForGpu();
@@ -370,35 +452,39 @@ bool Sample3DSceneRenderer::Render()
 		m_commandList->RSSetViewports(1, &pass1Viewport);
 		m_commandList->RSSetScissorRects(1, &m_pass1ScissorRect);
 
-		// Indicate this resource will be in use as a render target.
-		CD3DX12_RESOURCE_BARRIER renderTargetResourceBarrier =
-			CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		m_commandList->ResourceBarrier(1, &renderTargetResourceBarrier);
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
 
-		// Record drawing commands.
-		D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = m_deviceResources->GetRenderTargetView();
-		D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = m_deviceResources->GetDepthStencilView();
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = m_deviceResources->GetIntermediateRenderTargetCpuDescriptor();
+			D3D12_CPU_DESCRIPTOR_HANDLE depthStencilView = m_deviceResources->GetDepthStencilView();
 
-		float cornflowerBlue[] = {0.3f, 0.58f, 0.93f, 1.0f};
-		m_commandList->ClearRenderTargetView(renderTargetView, cornflowerBlue, 0, nullptr);
-		m_commandList->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-		m_commandList->OMSetRenderTargets(1, &renderTargetView, false, &depthStencilView);
+			float cornflowerBlue[] = { 0.3f, 0.58f, 0.93f, 1.0f };
+			m_commandList->ClearRenderTargetView(renderTargetView, cornflowerBlue, 0, nullptr);
+			m_commandList->ClearDepthStencilView(depthStencilView, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+			m_commandList->OMSetRenderTargets(1, &renderTargetView, false, &depthStencilView);
+		}
 
 		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		m_commandList->IASetIndexBuffer(&m_indexBufferView);
+		m_commandList->IASetVertexBuffers(0, 1, &m_spinningCubeVertexBufferView);
+		m_commandList->IASetIndexBuffer(&m_spinningCubeIndexBufferView);
 		m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
 
-		// Indicate that the render target will now be used to present when the command list is done executing.
-		CD3DX12_RESOURCE_BARRIER presentResourceBarrier =
-			CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-		m_commandList->ResourceBarrier(1, &presentResourceBarrier);
 	}
 	// Pass 2
 	{
-		// Set RTV as source
-		// Set presented swap chain as dest
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_commandList->IASetVertexBuffers(0, 1, &m_texturedQuadVertexBufferView);
+		m_commandList->IASetIndexBuffer(&m_texturedQuadIndexBufferView);
+		m_commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 	}
 
 	DX::ThrowIfFailed(m_commandList->Close());
