@@ -543,7 +543,7 @@ bool Sample3DSceneRenderer::Render()
 		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
 
 		// Set the viewport and scissor rectangle.
-		D3D12_VIEWPORT pass2Viewport = m_deviceResources->GetPass1Viewport();
+		D3D12_VIEWPORT pass2Viewport = m_deviceResources->GetPass2Viewport();
 		m_commandList->RSSetViewports(1, &pass2Viewport);
 		m_commandList->RSSetScissorRects(1, &m_pass2ScissorRect);
 
