@@ -284,8 +284,7 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 void DX::DeviceResources::SetWindow(HWND hwnd)
 {
 	m_window = hwnd;
-
-	// Todo: re-create resources here if needed
+	CreateTargetSizeDependentResources();
 }
 
 // This method is called in the event handler for the SizeChanged event.
