@@ -14,6 +14,12 @@ scaling::scalingMain g_spinningCubeMain;
 HWND g_hwnd{};
 bool g_done = false;
 
+int g_scaling_sourceWidth = 320;
+int g_scaling_sourceHeight = 240;
+
+int g_scaling_destWidth = 1024;
+int g_scaling_destHeight = 768;
+
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -125,8 +131,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
        CW_USEDEFAULT, // x
        0,  // y
-       destWidth,
-       destHeight,
+       g_scaling_destWidth,
+       g_scaling_destHeight,
        nullptr, 
        nullptr, 
        hInstance, 

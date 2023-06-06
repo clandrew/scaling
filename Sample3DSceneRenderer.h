@@ -38,7 +38,10 @@ namespace scaling
 		ModelViewProjectionConstantBuffer					m_constantBufferData;
 		UINT8*												m_mappedConstantBuffer;
 		UINT												m_cbvDescriptorSize;
-		D3D12_RECT											m_scissorRect;
+
+		D3D12_RECT											m_pass1ScissorRect;
+		D3D12_RECT											m_pass2ScissorRect;
+
 		D3D12_VERTEX_BUFFER_VIEW							m_vertexBufferView;
 		D3D12_INDEX_BUFFER_VIEW								m_indexBufferView;
 

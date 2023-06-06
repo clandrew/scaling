@@ -2,8 +2,8 @@
 
 #include "resource.h"
 
-int g_scaling_sourceWidth = 320;
-int g_scaling_sourceHeight = 240;
+extern int g_scaling_sourceWidth;
+extern int g_scaling_sourceHeight;
 
-int g_scaling_destWidth = 1024;
-int g_scaling_destHeight = 768;
+extern int g_scaling_destWidth;
+extern int g_scaling_destHeight;

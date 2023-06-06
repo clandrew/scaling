@@ -283,11 +283,11 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 void Sample3DSceneRenderer::CreateTargetSizeDependentResources()
 {
 
-	D3D12_VIEWPORT viewport = m_deviceResources->GetScreenViewport();
-	m_scissorRect = { 0, 0, static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};
+	D3D12_VIEWPORT pass1Viewport = m_deviceResources->GetPass1Viewport();
+	m_pass1ScissorRect = { 0, 0, static_cast<LONG>(pass1Viewport.Width), static_cast<LONG>(pass1Viewport.Height)};
 
-	// This is a simple example of change that can be made when the app is in
-	// portrait or snapped view.
+	float aspectRatio = static_cast<float>(pass1Viewport.Width) / static_cast<float>(pass1Viewport.Height);
+	float fovAngleY = 70.0f * XM_PI / 180.0f;
 	if (aspectRatio < 1.0f)
 	{
 		fovAngleY *= 2.0f;
@@ -354,6 +354,7 @@ bool Sample3DSceneRenderer::Render()
 	// The command list can be reset anytime after ExecuteCommandList() is called.
 	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), m_pipelineState.Get()));
 
+	// Pass 1
 	{
 		// Set the graphics root signature and descriptor heaps to be used by this frame.
 		m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -365,9 +366,9 @@ bool Sample3DSceneRenderer::Render()
 		m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
 		// Set the viewport and scissor rectangle.
-		D3D12_VIEWPORT viewport = m_deviceResources->GetScreenViewport();
-		m_commandList->RSSetViewports(1, &viewport);
-		m_commandList->RSSetScissorRects(1, &m_scissorRect);
+		D3D12_VIEWPORT pass1Viewport = m_deviceResources->GetPass1Viewport();
+		m_commandList->RSSetViewports(1, &pass1Viewport);
+		m_commandList->RSSetScissorRects(1, &m_pass1ScissorRect);
 
 		// Indicate this resource will be in use as a render target.
 		CD3DX12_RESOURCE_BARRIER renderTargetResourceBarrier =
@@ -393,6 +394,11 @@ bool Sample3DSceneRenderer::Render()
 		CD3DX12_RESOURCE_BARRIER presentResourceBarrier =
 			CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		m_commandList->ResourceBarrier(1, &presentResourceBarrier);
+	}
+	// Pass 2
+	{
+		// Set RTV as source
+		// Set presented swap chain as dest
 	}
 
 	DX::ThrowIfFailed(m_commandList->Close());
