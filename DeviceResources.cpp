@@ -240,7 +240,7 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 			m_d3dDevice->CreateRenderTargetView(m_swapChainRenderTargets[n].Get(), nullptr, rtvDescriptor);
 			rtvDescriptor.Offset(m_rtvDescriptorSize);
 
-			WCHAR name[25];
+			WCHAR name[35];
 			if (swprintf_s(name, L"m_swapChainRenderTargets[%u]", n) > 0)
 			{
 				DX::SetName(m_swapChainRenderTargets[n].Get(), name);
@@ -248,9 +248,33 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 		}
 	}
 
+	D3D12_HEAP_PROPERTIES defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	// Create intermediate render target and view for it.
+	{
+		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_B8G8R8A8_UNORM, g_scaling_sourceWidth, g_scaling_sourceHeight, 1, 1);
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+		float cornflowerBlue[] = { 0.3f, 0.58f, 0.93f, 1.0f };
+		CD3DX12_CLEAR_VALUE clearValue(DXGI_FORMAT_B8G8R8A8_UNORM, cornflowerBlue);
+
+		ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			&clearValue,
+			IID_PPV_ARGS(&m_intermediateRenderTarget)
+		));
+		NAME_D3D12_OBJECT(m_intermediateRenderTarget);
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), c_frameCount, m_rtvDescriptorSize);
+		m_d3dDevice->CreateRenderTargetView(m_intermediateRenderTarget.Get(), nullptr, rtvDescriptor);
+
+	}
+
 	// Create a depth stencil and view.
 	{
-		D3D12_HEAP_PROPERTIES depthHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 		D3D12_RESOURCE_DESC depthResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_depthBufferFormat, backBufferWidth, backBufferHeight, 1, 1);
 		depthResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -258,7 +282,7 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 		CD3DX12_CLEAR_VALUE depthOptimizedClearValue(m_depthBufferFormat, 1.0f, 0);
 
 		ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
-			&depthHeapProperties,
+			&defaultHeapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&depthResourceDesc,
 			D3D12_RESOURCE_STATE_DEPTH_WRITE,

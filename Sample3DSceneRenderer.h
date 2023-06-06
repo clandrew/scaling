@@ -30,7 +30,6 @@ namespace scaling
 		// Direct3D resources for cube geometry.
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>	m_commandList;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature>			m_rootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pipelineState;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		m_cbvHeap;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_constantBuffer;
 		ModelViewProjectionConstantBuffer					m_constantBufferData;
@@ -38,12 +37,14 @@ namespace scaling
 		UINT												m_cbvDescriptorSize;
 
 		D3D12_RECT											m_pass1ScissorRect;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pass1PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_spinningCubeVertexBuffer;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_spinningCubeIndexBuffer;
 		D3D12_VERTEX_BUFFER_VIEW							m_spinningCubeVertexBufferView;
 		D3D12_INDEX_BUFFER_VIEW								m_spinningCubeIndexBufferView;
 
 		D3D12_RECT											m_pass2ScissorRect;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pass2PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadVertexBuffer;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadIndexBuffer;
 		D3D12_VERTEX_BUFFER_VIEW							m_texturedQuadVertexBufferView;

@@ -85,7 +85,32 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		state.DSVFormat = m_deviceResources->GetDepthBufferFormat();
 		state.SampleDesc.Count = 1;
 
-		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pipelineState)));
+		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pass1PipelineState)));
+	};
+	{
+
+		static const D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		};
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
+		state.InputLayout = { inputLayout, _countof(inputLayout) };
+		state.pRootSignature = m_rootSignature.Get();
+		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_SampleVertexShader), _countof(g_SampleVertexShader));
+		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_SamplePixelShader), _countof(g_SamplePixelShader));
+		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		state.SampleMask = UINT_MAX;
+		state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		state.NumRenderTargets = 1;
+		state.RTVFormats[0] = m_deviceResources->GetBackBufferFormat();
+		state.DSVFormat = DXGI_FORMAT_UNKNOWN;
+		state.SampleDesc.Count = 1;
+
+		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pass2PipelineState)));
 	};
 
 	// Create and upload cube and quad geometry resources to the GPU.
@@ -93,7 +118,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		auto d3dDevice = m_deviceResources->GetD3DDevice();
 
 		// Create a command list.
-		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
         NAME_D3D12_OBJECT(m_commandList);
 
 		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
@@ -364,9 +389,11 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 // Initializes view parameters when the window size changes.
 void Sample3DSceneRenderer::CreateTargetSizeDependentResources()
 {
-
 	D3D12_VIEWPORT pass1Viewport = m_deviceResources->GetPass1Viewport();
 	m_pass1ScissorRect = { 0, 0, static_cast<LONG>(pass1Viewport.Width), static_cast<LONG>(pass1Viewport.Height)};
+
+	D3D12_VIEWPORT pass2Viewport = m_deviceResources->GetPass2Viewport();
+	m_pass2ScissorRect = { 0, 0, static_cast<LONG>(pass2Viewport.Width), static_cast<LONG>(pass2Viewport.Height) };
 
 	float aspectRatio = static_cast<float>(pass1Viewport.Width) / static_cast<float>(pass1Viewport.Height);
 	float fovAngleY = 70.0f * XM_PI / 180.0f;
@@ -434,18 +461,20 @@ bool Sample3DSceneRenderer::Render()
 	DX::ThrowIfFailed(m_deviceResources->GetCommandAllocator()->Reset());
 
 	// The command list can be reset anytime after ExecuteCommandList() is called.
-	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), m_pipelineState.Get()));
+	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), nullptr));
+
+	// Set the graphics root signature and descriptor heaps to be used by this frame.
+	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
+	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	// Bind the current frame's constant buffer to the pipeline.
+	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), m_deviceResources->GetCurrentFrameIndex(), m_cbvDescriptorSize);
+	m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
 	// Pass 1
 	{
-		// Set the graphics root signature and descriptor heaps to be used by this frame.
-		m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-		ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-		m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-		// Bind the current frame's constant buffer to the pipeline.
-		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), m_deviceResources->GetCurrentFrameIndex(), m_cbvDescriptorSize);
-		m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+		m_commandList->SetPipelineState(m_pass1PipelineState.Get());
 
 		// Set the viewport and scissor rectangle.
 		D3D12_VIEWPORT pass1Viewport = m_deviceResources->GetPass1Viewport();
@@ -476,15 +505,40 @@ bool Sample3DSceneRenderer::Render()
 	}
 	// Pass 2
 	{
+		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
+
+		// Set the viewport and scissor rectangle.
+		D3D12_VIEWPORT pass2Viewport = m_deviceResources->GetPass1Viewport();
+		m_commandList->RSSetViewports(1, &pass2Viewport);
+		m_commandList->RSSetScissorRects(1, &m_pass2ScissorRect);
+
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView = m_deviceResources->GetSwapChainRenderTargetCpuDescriptor();
+
+			float cornflowerBlue[] = { 0.3f, 0.58f, 0.93f, 1.0f };
+			m_commandList->ClearRenderTargetView(renderTargetView, cornflowerBlue, 0, nullptr);
+			m_commandList->OMSetRenderTargets(1, &renderTargetView, false, nullptr);
+		}
 		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_commandList->IASetVertexBuffers(0, 1, &m_texturedQuadVertexBufferView);
 		m_commandList->IASetIndexBuffer(&m_texturedQuadIndexBufferView);
 		m_commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
 	}
 
 	DX::ThrowIfFailed(m_commandList->Close());
