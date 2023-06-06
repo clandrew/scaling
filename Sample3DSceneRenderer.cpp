@@ -3,8 +3,10 @@
 
 #include "DirectXHelper.h"
 
-#include "SampleVertexShader.h"
-#include "SamplePixelShader.h"
+#include "Pass1VS.h"
+#include "Pass1PS.h"
+#include "Pass2VS.h"
+#include "Pass2PS.h"
 
 using namespace scaling;
 
@@ -36,7 +38,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 {
 	auto d3dDevice = m_deviceResources->GetD3DDevice();
 
-	// Create a root signature with a single constant buffer slot.
+	// Pass1 root sig
 	{
 		CD3DX12_DESCRIPTOR_RANGE range;
 		CD3DX12_ROOT_PARAMETER parameter;
@@ -57,8 +59,49 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		ComPtr<ID3DBlob> pSignature;
 		ComPtr<ID3DBlob> pError;
 		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
-		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-        NAME_D3D12_OBJECT(m_rootSignature);
+		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_pass1RootSignature)));
+        NAME_D3D12_OBJECT(m_pass1RootSignature);
+	}
+	// Pass2 root sig
+	{
+		CD3DX12_DESCRIPTOR_RANGE range;
+		CD3DX12_ROOT_PARAMETER parameter;
+
+		UINT baseShaderRegister = 0;
+		UINT numDescriptors = 1;
+		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numDescriptors, baseShaderRegister);
+		parameter.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+
+		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+
+		D3D12_STATIC_SAMPLER_DESC sampler = {};
+		sampler.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.MipLODBias = 0;
+		sampler.MaxAnisotropy = 0;
+		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+		sampler.MinLOD = 0.0f;
+		sampler.MaxLOD = D3D12_FLOAT32_MAX;
+		sampler.ShaderRegister = 0;
+		sampler.RegisterSpace = 0;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
+		descRootSignature.Init(1, &parameter, 1u, &sampler, rootSignatureFlags);
+
+
+		ComPtr<ID3DBlob> pSignature;
+		ComPtr<ID3DBlob> pError;
+		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
+		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_pass2RootSignature)));
+		NAME_D3D12_OBJECT(m_pass2RootSignature);
 	}
 
 	// Create the pipeline state once the shaders are loaded.
@@ -72,9 +115,9 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_rootSignature.Get();
-        state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_SampleVertexShader), _countof(g_SampleVertexShader));
-        state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_SamplePixelShader), _countof(g_SamplePixelShader));
+		state.pRootSignature = m_pass1RootSignature.Get();
+        state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1VS), _countof(g_Pass1VS));
+        state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1PS), _countof(g_Pass1PS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -92,14 +135,14 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		static const D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_rootSignature.Get();
-		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_SampleVertexShader), _countof(g_SampleVertexShader));
-		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_SamplePixelShader), _countof(g_SamplePixelShader));
+		state.pRootSignature = m_pass2RootSignature.Get();
+		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2VS), _countof(g_Pass2VS));
+		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2PS), _countof(g_Pass2PS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -243,12 +286,12 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Quad
 		{
-			VertexPositionColor quadVertices[] =
+		VertexUV quadVertices[] =
 			{
-				{ XMFLOAT3(-1, -1, 1), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // Top left
-				{ XMFLOAT3(1,  -1, 1), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // Top right
-				{ XMFLOAT3(-1,  1, 1), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // Bottom left
-				{ XMFLOAT3(1,   1, 1), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // Bottom right
+				{ XMFLOAT3(-1, -1, 1), XMFLOAT2(0.0f, 0.0f) }, // Top left
+				{ XMFLOAT3(1,  -1, 1), XMFLOAT2(1.0f, 0.0f) }, // Top right
+				{ XMFLOAT3(-1,  1, 1), XMFLOAT2(0.0f, 1.0f) }, // Bottom left
+				{ XMFLOAT3(1,   1, 1), XMFLOAT2(1.0f, 1.0f) }, // Bottom right
 			};
 			const UINT quadVertexBufferSize = sizeof(quadVertices);
 
@@ -264,7 +307,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 			// Create vertex/index buffer views.
 			m_texturedQuadVertexBufferView.BufferLocation = m_texturedQuadVertexBuffer->GetGPUVirtualAddress();
-			m_texturedQuadVertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
+			m_texturedQuadVertexBufferView.StrideInBytes = sizeof(VertexUV);
 			m_texturedQuadVertexBufferView.SizeInBytes = sizeof(quadVertices);
 
 			DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
@@ -463,10 +506,10 @@ bool Sample3DSceneRenderer::Render()
 	// The command list can be reset anytime after ExecuteCommandList() is called.
 	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), nullptr));
 
-	// Set the graphics root signature and descriptor heaps to be used by this frame.
-	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	m_commandList->SetGraphicsRootSignature(m_pass1RootSignature.Get());
 
 	// Bind the current frame's constant buffer to the pipeline.
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), m_deviceResources->GetCurrentFrameIndex(), m_cbvDescriptorSize);
@@ -505,6 +548,7 @@ bool Sample3DSceneRenderer::Render()
 	}
 	// Pass 2
 	{
+		m_commandList->SetGraphicsRootSignature(m_pass2RootSignature.Get());
 		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
 
 		// Set the viewport and scissor rectangle.

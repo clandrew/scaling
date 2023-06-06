@@ -22,6 +22,9 @@
     <Filter Include="D3DX">
       <UniqueIdentifier>{e6ff278a-9a8e-422f-837d-401d5c968ae1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="CompiledShaders">
+      <UniqueIdentifier>{bf35a852-eadd-4395-bca8-1636219daf53}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -87,21 +90,21 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SamplePixelShader.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="SampleVertexShader.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="d3dx12.h">
       <Filter>D3DX</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="SamplePixelShader.hlsl">
+    <FxCompile Include="Pass1PS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="SampleVertexShader.hlsl">
+    <FxCompile Include="Pass1VS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Pass2VS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Pass2PS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

@@ -16,4 +16,10 @@ namespace scaling
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMFLOAT3 color;
 	};
+
+	struct VertexUV
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT2 uv;
+	};
 }
