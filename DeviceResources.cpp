@@ -86,10 +86,11 @@ void DX::DeviceResources::CreateDeviceResources()
 #if defined(_DEBUG)
 	// If the project is in a debug build, enable debugging via SDK Layers.
 	{
-		ComPtr<ID3D12Debug> debugController;
+		ComPtr<ID3D12Debug1> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
+			debugController->SetEnableGPUBasedValidation(TRUE);
 		}
 	}
 #endif
@@ -138,7 +139,7 @@ void DX::DeviceResources::CreateDeviceResources()
 	DX::ThrowIfFailed(m_d3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 	NAME_D3D12_OBJECT(m_rtvHeap);
 
-	m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);	
 
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 	dsvHeapDesc.NumDescriptors = 1;
@@ -270,7 +271,6 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), c_frameCount, m_rtvDescriptorSize);
 		m_d3dDevice->CreateRenderTargetView(m_intermediateRenderTarget.Get(), nullptr, rtvDescriptor);
-
 	}
 
 	// Create a depth stencil and view.

@@ -38,39 +38,21 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 {
 	auto d3dDevice = m_deviceResources->GetD3DDevice();
 
-	// Pass1 root sig
 	{
-		CD3DX12_DESCRIPTOR_RANGE range;
+		CD3DX12_DESCRIPTOR_RANGE ranges[2];
 		CD3DX12_ROOT_PARAMETER parameter;
 
-		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-		parameter.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_VERTEX);
-
-		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
-			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-			D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-
-		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
-		descRootSignature.Init(1, &parameter, 0, nullptr, rootSignatureFlags);
-
-		ComPtr<ID3DBlob> pSignature;
-		ComPtr<ID3DBlob> pError;
-		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
-		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_pass1RootSignature)));
-        NAME_D3D12_OBJECT(m_pass1RootSignature);
-	}
-	// Pass2 root sig
-	{
-		CD3DX12_DESCRIPTOR_RANGE range;
-		CD3DX12_ROOT_PARAMETER parameter;
-
-		UINT baseShaderRegister = 0;
-		UINT numDescriptors = 1;
-		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numDescriptors, baseShaderRegister);
-		parameter.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+		{
+			UINT numDescriptors = DX::c_frameCount;
+			UINT baseShaderRegister = 0;
+			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numDescriptors, baseShaderRegister);
+		}
+		{
+			UINT numDescriptors = 1;
+			UINT baseShaderRegister = 0;
+			ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numDescriptors, baseShaderRegister);
+		}
+		parameter.InitAsDescriptorTable(_countof(ranges), ranges, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
@@ -96,12 +78,11 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
 		descRootSignature.Init(1, &parameter, 1u, &sampler, rootSignatureFlags);
 
-
 		ComPtr<ID3DBlob> pSignature;
 		ComPtr<ID3DBlob> pError;
 		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
-		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_pass2RootSignature)));
-		NAME_D3D12_OBJECT(m_pass2RootSignature);
+		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonRootSignature)));
+        NAME_D3D12_OBJECT(m_commonRootSignature);
 	}
 
 	// Create the pipeline state once the shaders are loaded.
@@ -115,7 +96,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_pass1RootSignature.Get();
+		state.pRootSignature = m_commonRootSignature.Get();
         state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1VS), _countof(g_Pass1VS));
         state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1PS), _countof(g_Pass1PS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -140,7 +121,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_pass2RootSignature.Get();
+		state.pRootSignature = m_commonRootSignature.Get();
 		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2VS), _countof(g_Pass2VS));
 		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2PS), _countof(g_Pass2PS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -372,16 +353,16 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			m_commandList->ResourceBarrier(1, &indexBufferResourceBarrier);
 		}
 
-		// Create a descriptor heap for the constant buffers.
+		// Create a descriptor heap for the constant buffers and SRV.
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-			heapDesc.NumDescriptors = DX::c_frameCount;
+			heapDesc.NumDescriptors = DX::c_frameCount + 1;
 			heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 			// This flag indicates that this descriptor heap can be bound to the pipeline and that descriptors contained in it can be referenced by a root table.
 			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			DX::ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+			DX::ThrowIfFailed(d3dDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
-            NAME_D3D12_OBJECT(m_cbvHeap);
+            NAME_D3D12_OBJECT(m_cbvSrvHeap);
 		}
 
 		CD3DX12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(DX::c_frameCount * c_alignedConstantBufferSize);
@@ -397,7 +378,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Create constant buffer views to access the upload buffer.
 		D3D12_GPU_VIRTUAL_ADDRESS cbvGpuAddress = m_constantBuffer->GetGPUVirtualAddress();
-		CD3DX12_CPU_DESCRIPTOR_HANDLE cbvCpuHandle(m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cbvSrvCpuHandle(m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 		m_cbvDescriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		for (int n = 0; n < DX::c_frameCount; n++)
@@ -405,10 +386,21 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
 			desc.BufferLocation = cbvGpuAddress;
 			desc.SizeInBytes = c_alignedConstantBufferSize;
-			d3dDevice->CreateConstantBufferView(&desc, cbvCpuHandle);
+			d3dDevice->CreateConstantBufferView(&desc, cbvSrvCpuHandle);
 
 			cbvGpuAddress += desc.SizeInBytes;
-			cbvCpuHandle.Offset(m_cbvDescriptorSize);
+			cbvSrvCpuHandle.Offset(m_cbvDescriptorSize);
+		}
+
+		// Create SRV
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = 1;
+			d3dDevice->CreateShaderResourceView(m_deviceResources->GetIntermediateRenderTarget(), &srvDesc, cbvSrvCpuHandle);
+
 		}
 
 		// Map the constant buffers.
@@ -506,13 +498,13 @@ bool Sample3DSceneRenderer::Render()
 	// The command list can be reset anytime after ExecuteCommandList() is called.
 	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), nullptr));
 
-	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
+	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap.Get() };
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-	m_commandList->SetGraphicsRootSignature(m_pass1RootSignature.Get());
+	m_commandList->SetGraphicsRootSignature(m_commonRootSignature.Get());
 
 	// Bind the current frame's constant buffer to the pipeline.
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), m_deviceResources->GetCurrentFrameIndex(), m_cbvDescriptorSize);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvDescriptorSize);
 	m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
 
 	// Pass 1
@@ -548,7 +540,6 @@ bool Sample3DSceneRenderer::Render()
 	}
 	// Pass 2
 	{
-		m_commandList->SetGraphicsRootSignature(m_pass2RootSignature.Get());
 		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
 
 		// Set the viewport and scissor rectangle.
