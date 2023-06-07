@@ -65,3 +65,13 @@ void scalingMain::OnDeviceRemoved()
 	// and its resources which are no longer valid.
 	m_sceneRenderer = nullptr;
 }
+
+void scalingMain::OnPressLeftKey()
+{
+	return m_sceneRenderer->OnPressLeftKey();
+}
+
+void scalingMain::OnPressRightKey()
+{
+	return m_sceneRenderer->OnPressRightKey();
+}

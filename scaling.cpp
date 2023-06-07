@@ -207,6 +207,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		break;
+    case WM_KEYDOWN:
+        {
+            if (wParam == 37)
+            {
+                g_spinningCubeMain.OnPressLeftKey();
+            }
+            else if (wParam == 39)
+            {
+                g_spinningCubeMain.OnPressRightKey();
+            }
+            break;
+        }
     case WM_DESTROY:
 		g_done = true;
         PostQuitMessage(0);

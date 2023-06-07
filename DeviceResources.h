@@ -33,6 +33,8 @@ namespace DX
 
 		bool						IsDeviceRemoved() const				{ return m_deviceRemoved; }
 
+		HWND						GetWindow() const					{ return m_window; }
+
 		// D3D Accessors.
 		ID3D12Device*				GetD3DDevice() const				{ return m_d3dDevice.Get(); }
 		IDXGISwapChain3*			GetSwapChain() const				{ return m_swapChain.Get(); }

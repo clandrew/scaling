@@ -6,6 +6,14 @@
 
 namespace scaling
 {
+	enum class ScalingType
+	{
+		Point,
+		Linear,
+		NumScalingTypes
+	};
+
+
 	// This sample renderer instantiates a basic rendering pipeline.
 	class Sample3DSceneRenderer
 	{
@@ -16,9 +24,12 @@ namespace scaling
 		void CreateTargetSizeDependentResources();
 		void Update(DX::StepTimer const& timer);
 		bool Render();
+		void OnPressLeftKey();
+		void OnPressRightKey();
 
 	private:
 		void Rotate(float radians);
+		void UpdateWindowTitleText();
 
 	private:
 		// Constant buffers must be 256-byte aligned.
@@ -57,6 +68,8 @@ namespace scaling
 		float	m_radiansPerSecond;
 		float	m_angle;
 		bool	m_tracking;
+
+		ScalingType m_scalingType;
 	};
 }
 

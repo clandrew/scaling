@@ -20,12 +20,15 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_angle(0),
 	m_tracking(false),
 	m_mappedConstantBuffer(nullptr),
-	m_deviceResources(deviceResources)
+	m_deviceResources(deviceResources),
+	m_scalingType(ScalingType::Point)
 {
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
 	CreateDeviceDependentResources();
 	CreateTargetSizeDependentResources();
+
+	UpdateWindowTitleText();
 }
 
 Sample3DSceneRenderer::~Sample3DSceneRenderer()
@@ -61,7 +64,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
-		sampler.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -583,4 +586,45 @@ bool Sample3DSceneRenderer::Render()
 	m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	return true;
+}
+
+void Sample3DSceneRenderer::UpdateWindowTitleText()
+{
+	wchar_t const* titleText = L"";
+	switch (m_scalingType)
+	{
+	case ScalingType::Point: titleText = L"Scaling type: Point"; break;
+	case ScalingType::Linear: titleText = L"Scaling type: Linear"; break;
+	default:
+		assert(false);
+		titleText = L"Scaling type: <error>";
+	}
+	SetWindowText(m_deviceResources->GetWindow(), titleText);
+}
+
+void Sample3DSceneRenderer::OnPressLeftKey()
+{
+	if (m_scalingType == ScalingType::Point)
+	{
+		m_scalingType = ScalingType::Linear; // The last one
+	}
+	else
+	{
+		m_scalingType = static_cast<ScalingType>((int)m_scalingType - 1);
+	}
+	UpdateWindowTitleText();
+}
+
+void Sample3DSceneRenderer::OnPressRightKey()
+{
+	if (m_scalingType == ScalingType::Linear)
+	{
+		m_scalingType = ScalingType::Point; // The first one
+	}
+	else
+	{
+		m_scalingType = static_cast<ScalingType>((int)m_scalingType + 1);
+	}
+
+	UpdateWindowTitleText();
 }
