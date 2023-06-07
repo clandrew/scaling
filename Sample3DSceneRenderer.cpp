@@ -63,26 +63,45 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 
-		D3D12_STATIC_SAMPLER_DESC sampler = {};
-		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.MipLODBias = 0;
-		sampler.MaxAnisotropy = 0;
-		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-		sampler.MinLOD = 0.0f;
-		sampler.MaxLOD = D3D12_FLOAT32_MAX;
-		sampler.ShaderRegister = 0;
-		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		D3D12_STATIC_SAMPLER_DESC samplers[2] = {};
+		{
+			samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+			samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[0].MipLODBias = 0;
+			samplers[0].MaxAnisotropy = 0;
+			samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+			samplers[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+			samplers[0].MinLOD = 0.0f;
+			samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+			samplers[0].ShaderRegister = 0;
+			samplers[0].RegisterSpace = 0;
+			samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		}
+		{
+			samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+			samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			samplers[1].MipLODBias = 0;
+			samplers[1].MaxAnisotropy = 0;
+			samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+			samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+			samplers[1].MinLOD = 0.0f;
+			samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+			samplers[1].ShaderRegister = 0;
+			samplers[1].RegisterSpace = 0;
+			samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		}
 
 		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
-		descRootSignature.Init(1, &parameter, 1u, &sampler, rootSignatureFlags);
+		descRootSignature.Init(1, &parameter, 2u, samplers, rootSignatureFlags);
 
 		ComPtr<ID3DBlob> pSignature;
 		ComPtr<ID3DBlob> pError;
+
+		__debugbreak();
 		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
 		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonRootSignature)));
         NAME_D3D12_OBJECT(m_commonRootSignature);
