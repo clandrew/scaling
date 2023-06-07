@@ -1,5 +1,4 @@
-Texture2D g_inputTexture : register(t0);
-SamplerState g_sampler : register(s0);
+#include "Bindings.hlsli"
 
 struct PSInput
 {
@@ -10,5 +9,5 @@ struct PSInput
 float4 main(PSInput input) : SV_TARGET
 {
 	float2 uv = input.uv;
-	return g_inputTexture.Sample(g_sampler, uv);
+	return g_inputTexture.Sample(g_samplers[0], uv);
 }

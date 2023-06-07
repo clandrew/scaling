@@ -1,10 +1,4 @@
-// A constant buffer that stores the three basic column-major matrices for composing geometry.
-cbuffer ModelViewProjectionConstantBuffer : register(b0)
-{
-	matrix model;
-	matrix view;
-	matrix projection;
-};
+#include "Bindings.hlsli"
 
 // Per-vertex data used as input to the vertex shader.
 struct VertexShaderInput

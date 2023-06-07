@@ -46,7 +46,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		CD3DX12_ROOT_PARAMETER parameter;
 
 		{
-			UINT numDescriptors = DX::c_frameCount;
+			UINT numDescriptors = DX::c_frameCount; // constant buffer for each frame
 			UINT baseShaderRegister = 0;
 			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numDescriptors, baseShaderRegister);
 		}
