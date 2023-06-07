@@ -90,7 +90,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
 			samplers[1].MinLOD = 0.0f;
 			samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
-			samplers[1].ShaderRegister = 0;
+			samplers[1].ShaderRegister = 1;
 			samplers[1].RegisterSpace = 0;
 			samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		}
@@ -101,8 +101,12 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		ComPtr<ID3DBlob> pSignature;
 		ComPtr<ID3DBlob> pError;
 
-		__debugbreak();
-		DX::ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf()));
+		HRESULT serializeRootSignatureHR = D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf());
+		if (FAILED(serializeRootSignatureHR))
+		{
+			OutputDebugStringA(reinterpret_cast<char*>(pError->GetBufferPointer()));
+			_com_issue_error(serializeRootSignatureHR);
+		}
 		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonRootSignature)));
         NAME_D3D12_OBJECT(m_commonRootSignature);
 	}
