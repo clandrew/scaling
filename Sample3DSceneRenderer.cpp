@@ -104,7 +104,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			&defaultHeapType,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_COPY_SOURCE,
 			nullptr,
 			IID_PPV_ARGS(&m_dlssTarget)));
 	}
@@ -712,11 +712,22 @@ bool Sample3DSceneRenderer::Render()
 	{
 		assert(m_scalingType == ScalingType::DLSS);
 
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_dlssTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
 		NVSDK_NGX_Result Status{};
 
 		NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
 		dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
-		dlssEvalParams.Feature.pInOutput = m_dlssTarget.Get();
+		dlssEvalParams.Feature.pInOutput = m_dlssTarget.Get(); // Looks like you can't upscale directly to a swapchain target.
 		dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
 		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
 		dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
@@ -737,10 +748,23 @@ bool Sample3DSceneRenderer::Render()
 			m_ngxParameters,
 			&dlssEvalParams);
 
-		if (NVSDK_NGX_FAILED(Status))
+		DX::ThrowIfNGXFailed(Status);
+
 		{
-			assert(false);
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_dlssTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
 		}
+
+		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_dlssTarget.Get());
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		// Here: copy from m_dlssTarget to swapchain
 	}
 
 	DX::ThrowIfFailed(m_commandList->Close());
