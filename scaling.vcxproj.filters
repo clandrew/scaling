@@ -93,6 +93,24 @@
     <ClInclude Include="d3dx12.h">
       <Filter>D3DX</Filter>
     </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx_defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx_helpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx_helpers_vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx_params.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nvngx_dlss_sdk\include\nvsdk_ngx_vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Pass1PS.hlsl">

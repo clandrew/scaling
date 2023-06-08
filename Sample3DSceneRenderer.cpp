@@ -1,7 +1,10 @@
 ﻿#include "pch.h"
+
 #include "Sample3DSceneRenderer.h"
 
 #include "DirectXHelper.h"
+
+#include "scaling.h"
 
 #include "Pass1VS.h"
 #include "Pass1PS.h"
@@ -21,8 +24,11 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_tracking(false),
 	m_mappedConstantBuffer(nullptr),
 	m_deviceResources(deviceResources),
-	m_scalingType(ScalingType::Point),
-	m_isSpinning(true)
+	m_scalingType(ScalingType::DLSS),
+	m_isSpinning(true),
+	m_dlssSupported(false),
+	m_dlssSharpness(1.0f),
+	m_dlssReset(0)
 {
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
@@ -41,6 +47,68 @@ Sample3DSceneRenderer::~Sample3DSceneRenderer()
 void Sample3DSceneRenderer::CreateDeviceDependentResources()
 {
 	auto d3dDevice = m_deviceResources->GetD3DDevice();
+
+	// Create a command list.
+	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+	NAME_D3D12_OBJECT(m_commandList);
+
+
+	NVSDK_NGX_Result Status = NVSDK_NGX_D3D12_Init(12341234, L"./", d3dDevice);
+	DX::ThrowIfNGXFailed(Status);
+
+	Status = NVSDK_NGX_D3D12_GetCapabilityParameters(&m_ngxParameters);
+	DX::ThrowIfNGXFailed(Status);
+
+	int DLSSAvailable = 0;
+	Status = m_ngxParameters->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &DLSSAvailable);
+	DX::ThrowIfNGXFailed(Status);
+	m_dlssSupported = DLSSAvailable > 0;
+
+	{
+		int DlssCreateFeatureFlags = NVSDK_NGX_DLSS_Feature_Flags_None;
+
+		NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
+		dlssCreateParams.Feature.InTargetWidth = g_scaling_destWidth;
+		dlssCreateParams.Feature.InTargetHeight = g_scaling_destHeight;
+		dlssCreateParams.Feature.InWidth = g_scaling_sourceWidth;
+		dlssCreateParams.Feature.InHeight = g_scaling_sourceHeight;
+		dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
+		dlssCreateParams.InFeatureCreateFlags = DlssCreateFeatureFlags;
+
+		UINT creationNodeMask = 1;
+		UINT visibilityNodeMask = 1;
+		Status = NGX_D3D12_CREATE_DLSS_EXT(
+			m_commandList.Get(),
+			creationNodeMask,
+			visibilityNodeMask,
+			&m_dlssFeatureHandle,
+			m_ngxParameters,
+			&dlssCreateParams);
+
+		DX::ThrowIfNGXFailed(Status);
+	}
+	{
+		D3D12_RESOURCE_DESC resourceDesc{};
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resourceDesc.Width = g_scaling_sourceWidth;
+		resourceDesc.Height = g_scaling_sourceHeight;
+		resourceDesc.MipLevels = 1;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.Format = DXGI_FORMAT_R16G16_SINT;
+		resourceDesc.SampleDesc.Count = 1;
+		resourceDesc.SampleDesc.Quality = 0;
+
+		auto defaultHeapType = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+			&defaultHeapType,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE,
+			nullptr,
+			IID_PPV_ARGS(&m_motionVectors)));
+	}
+
+	DX::ThrowIfNGXFailed(Status);
 
 	{
 		CD3DX12_DESCRIPTOR_RANGE ranges[2];
@@ -173,12 +241,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 	// Create and upload cube and quad geometry resources to the GPU.
 	{
-		auto d3dDevice = m_deviceResources->GetD3DDevice();
-
-		// Create a command list.
-		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
-        NAME_D3D12_OBJECT(m_commandList);
-
 		CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
 		CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 
@@ -586,7 +648,9 @@ bool Sample3DSceneRenderer::Render()
 		m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
 
 	}
+
 	// Pass 2
+	if (m_scalingType == ScalingType::Point || m_scalingType == ScalingType::Linear)
 	{
 		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
 
@@ -623,6 +687,40 @@ bool Sample3DSceneRenderer::Render()
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 	}
+	else
+	{
+		assert(m_scalingType == ScalingType::DLSS);
+
+		NVSDK_NGX_Result Status{};
+
+		NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
+		dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
+		dlssEvalParams.Feature.pInOutput = m_deviceResources->GetSwapChainRenderTarget();
+		dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
+		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
+		dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
+		dlssEvalParams.pInExposureTexture = nullptr;
+		dlssEvalParams.pInBiasCurrentColorMask = nullptr; // OK to have null?
+		dlssEvalParams.InJitterOffsetX = 0;
+		dlssEvalParams.InJitterOffsetY = 0;
+		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
+		dlssEvalParams.InReset = m_dlssReset;
+		dlssEvalParams.InMVScaleX = 1.0f;
+		dlssEvalParams.InMVScaleY = 1.0f;
+		dlssEvalParams.InRenderSubrectDimensions.Width = g_scaling_destWidth;
+		dlssEvalParams.InRenderSubrectDimensions.Height = g_scaling_destHeight;
+
+		Status = NGX_D3D12_EVALUATE_DLSS_EXT(
+			m_commandList.Get(),
+			m_dlssFeatureHandle,
+			m_ngxParameters,
+			&dlssEvalParams);
+
+		if (NVSDK_NGX_FAILED(Status))
+		{
+			assert(false);
+		}
+	}
 
 	DX::ThrowIfFailed(m_commandList->Close());
 
@@ -640,6 +738,7 @@ void Sample3DSceneRenderer::UpdateWindowTitleText()
 	{
 	case ScalingType::Point: titleText = L"Scaling type: Point"; break;
 	case ScalingType::Linear: titleText = L"Scaling type: Linear"; break;
+	case ScalingType::DLSS: titleText = L"Scaling type: DLSS"; break;
 	default:
 		assert(false);
 		titleText = L"Scaling type: <error>";

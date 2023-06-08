@@ -10,6 +10,7 @@ namespace scaling
 	{
 		Point,
 		Linear,
+		DLSS,
 		NumScalingTypes
 	};
 
@@ -72,6 +73,15 @@ namespace scaling
 
 		ScalingType m_scalingType;
 		bool m_isSpinning;
+
+		// DLSS-related things
+		bool                                                m_dlssSupported;
+		NVSDK_NGX_Parameter*                                m_ngxParameters{};
+		NVSDK_NGX_Handle*                                   m_dlssFeatureHandle;
+		float                                               m_dlssSharpness;
+		int												    m_dlssReset;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_motionVectors;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				m_dlssTarget;
 	};
 }
 

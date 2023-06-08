@@ -11,6 +11,14 @@ namespace DX
 		}
 	}
 
+	inline void  ThrowIfNGXFailed(NVSDK_NGX_Result status)
+	{
+		if (NVSDK_NGX_FAILED(status))
+		{
+			_com_issue_error(E_FAIL);
+		}
+	}
+
 	inline std::vector<byte> ReadData(const std::wstring& filename)
 	{
 		std::vector<byte> result;

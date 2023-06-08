@@ -25,4 +25,7 @@
 
 #include "d3dx12.h"
 
+#include "nvsdk_ngx.h"
+#include "nvsdk_ngx_helpers.h"
+
 #endif //PCH_H
