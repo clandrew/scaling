@@ -12,9 +12,9 @@ struct DrawConstantsType
 {
 	int samplerIndex;
 };
-ConstantBuffer<DrawConstantsType> drawConstants : register(b1);
+ConstantBuffer<DrawConstantsType> drawConstants : register(b3);
 
 Texture2D g_inputTexture : register(t0);
 
-SamplerState g_sampler0 : register(s0);
-SamplerState g_sampler1 : register(s1);
+SamplerState g_sampler_point : register(s0);
+SamplerState g_sampler_linear : register(s1);

@@ -9,5 +9,12 @@ struct PSInput
 float4 main(PSInput input) : SV_TARGET
 {
 	float2 uv = input.uv;
-	return g_inputTexture.Sample(g_sampler0, uv);
+	if (drawConstants.samplerIndex == 0)
+	{
+		return g_inputTexture.Sample(g_sampler_point, uv);
+	}
+	else
+	{
+		return g_inputTexture.Sample(g_sampler_linear, uv);
+	}
 }

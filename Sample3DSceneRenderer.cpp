@@ -43,19 +43,27 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 	{
 		CD3DX12_DESCRIPTOR_RANGE ranges[2];
-		CD3DX12_ROOT_PARAMETER parameter;
+		CD3DX12_ROOT_PARAMETER parameters[2];
 
 		{
-			UINT numDescriptors = DX::c_frameCount; // constant buffer for each frame
-			UINT baseShaderRegister = 0;
-			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numDescriptors, baseShaderRegister);
+			{
+				UINT numDescriptors = DX::c_frameCount; // constant buffer for each frame
+				UINT baseShaderRegister = 0;
+				ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numDescriptors, baseShaderRegister);
+			}
+			{
+				UINT numDescriptors = 1;
+				UINT baseShaderRegister = 0;
+				ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numDescriptors, baseShaderRegister);
+			}
+			parameters[0].InitAsDescriptorTable(_countof(ranges), ranges, D3D12_SHADER_VISIBILITY_ALL);
 		}
 		{
-			UINT numDescriptors = 1;
-			UINT baseShaderRegister = 0;
-			ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numDescriptors, baseShaderRegister);
+			UINT num32BitValues = 1;
+			UINT shaderRegister = 3;
+			UINT registerSpace = 0u;
+			parameters[1].InitAsConstants(num32BitValues, shaderRegister, registerSpace, D3D12_SHADER_VISIBILITY_ALL);
 		}
-		parameter.InitAsDescriptorTable(_countof(ranges), ranges, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // Only the input assembler stage needs access to the constant buffer.
@@ -96,7 +104,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		}
 
 		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
-		descRootSignature.Init(1, &parameter, 2u, samplers, rootSignatureFlags);
+		descRootSignature.Init(_countof(parameters), parameters, _countof(samplers), samplers, rootSignatureFlags);
 
 		ComPtr<ID3DBlob> pSignature;
 		ComPtr<ID3DBlob> pError;
@@ -528,10 +536,24 @@ bool Sample3DSceneRenderer::Render()
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 	m_commandList->SetGraphicsRootSignature(m_commonRootSignature.Get());
-
-	// Bind the current frame's constant buffer to the pipeline.
-	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvDescriptorSize);
-	m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+	
+	// Set root params
+	{
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvDescriptorSize);
+		m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+	}
+	{
+		UINT samplerIndex = 0;
+		if (m_scalingType == ScalingType::Point)
+		{
+			samplerIndex = 0;
+		}
+		else if (m_scalingType == ScalingType::Linear)
+		{
+			samplerIndex = 1;
+		}
+		m_commandList->SetGraphicsRoot32BitConstant(1, samplerIndex, 0);
+	}
 
 	// Pass 1
 	{
