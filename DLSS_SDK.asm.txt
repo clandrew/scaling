@@ -1,0 +1,309 @@
+--- c:\dvs\p4\build\sw\devrel\libdev\ngx\core\rel_tot\source\api\nvsdk_ngx_d3d12_lib.cpp 
+;
+; Function: NVSDK_NGX_D3D12_EvaluateFeature_C
+; Returns a return value directly, e.g., NVSDK_NGX_Result_FAIL_InvalidParameter = 0xbad00005
+;
+00007FF62E78EDF0  sub         rsp,38h  
+00007FF62E78EDF4  mov         rax,rcx  
+00007FF62E78EDF7  mov         rcx,qword ptr [GContext+40h (07FF62E7C4A70h)]  
+00007FF62E78EDFE  test        rcx,rcx  
+00007FF62E78EE01  jne         NVSDK_NGX_D3D12_EvaluateFeature_C+1Dh (07FF62E78EE0Dh)  
+00007FF62E78EE03  mov         eax,0BAD00007h  
+00007FF62E78EE08  add         rsp,38h  
+00007FF62E78EE0C  ret  
+00007FF62E78EE0D  mov         qword ptr [rsp+20h],r9  
+00007FF62E78EE12  mov         r9,r8  
+00007FF62E78EE15  mov         r8,rdx  
+00007FF62E78EE18  mov         rdx,rax  
+00007FF62E78EE1B  call        NGXProgressCallbackHelper::EvaluateFeature<enum NVSDK_NGX_Result (__cdecl*)(ID3D12GraphicsCommandList * __ptr64,NVSDK_NGX_Handle const * __ptr64,NVSDK_NGX_Parameter const * __ptr64,void (__cdecl*)(float,bool & __ptr64)),ID3D12GraphicsCommandList * __ptr64> (07FF62E7769C4h)  
+00007FF62E78EE20  add         rsp,38h  ; Return value in RAX
+00007FF62E78EE24  ret  
+
+--- c:\dvs\p4\build\sw\devrel\libdev\ngx\core\rel_tot\source\lib\nvsdk_ngx_lib.h 
+;
+; Function: NGXProgressCallbackHelper::EvaluateFeature
+;
+00007FF62E78E190  mov         qword ptr [rsp+8],rbx  
+00007FF62E78E195  mov         qword ptr [rsp+10h],rbp  
+00007FF62E78E19A  mov         qword ptr [rsp+18h],rsi  
+00007FF62E78E19F  push        rdi  
+00007FF62E78E1A0  push        r14  
+00007FF62E78E1A2  push        r15  
+00007FF62E78E1A4  sub         rsp,20h  
+00007FF62E78E1A8  mov         r10d,dword ptr [_tls_index (07FF62E7E1BE8h)]  
+00007FF62E78E1AF  mov         r15,rcx  
+00007FF62E78E1B2  mov         rax,qword ptr gs:[58h]  
+00007FF62E78E1BB  xor         ebx,ebx  
+00007FF62E78E1BD  mov         ecx,108h  
+00007FF62E78E1C2  mov         rsi,r9  
+00007FF62E78E1C5  mov         rbp,r8  
+00007FF62E78E1C8  mov         r14,rdx  
+00007FF62E78E1CB  mov         rdi,qword ptr [rax+r10*8]  
+00007FF62E78E1CF  mov         rax,qword ptr [InCallback]  
+00007FF62E78E1D4  add         rdi,rcx  
+00007FF62E78E1D7  test        rax,rax  
+00007FF62E78E1DA  lea         rcx,[NGXProgressCallbackHelper::s_ReplacementCallback (07FF62E7761F4h)]  
+00007FF62E78E1E1  cmovne      rbx,rcx  
+00007FF62E78E1E5  mov         rcx,r15  
+00007FF62E78E1E8  mov         qword ptr [rdi],rax  
+00007FF62E78E1EB  call        qword ptr [__guard_check_icall_fptr (07FF62E7ED000h)]  
+00007FF62E78E1F1  mov         r9,rbx  
+00007FF62E78E1F4  mov         r8,rsi  
+00007FF62E78E1F7  mov         rdx,rbp  
+00007FF62E78E1FA  mov         rcx,r14  
+00007FF62E78E1FD  call        r15						; <--------------EvaluateFeature_Impl
+00007FF62E78E200  mov         rbx,qword ptr [rsp+40h]  
+00007FF62E78E205  mov         rbp,qword ptr [rsp+48h]  
+00007FF62E78E20A  mov         rsi,qword ptr [rsp+50h]  
+00007FF62E78E20F  mov         qword ptr [rdi],0  
+00007FF62E78E216  add         rsp,20h  
+00007FF62E78E21A  pop         r15  
+00007FF62E78E21C  pop         r14  
+00007FF62E78E21E  pop         rdi  ; Return value in RAX
+00007FF62E78E21F  ret  
+
+;
+; Function: EvaluateFeature_Impl
+;
+00007FFAC1D429F0  sub         rsp,38h  
+00007FFAC1D429F4  mov         qword ptr [rsp+20h],rcx  
+00007FFAC1D429F9  call        00007FFAC1D43450			; <-------------EvaluateFeature_Impl2
+00007FFAC1D429FE  add         rsp,38h				    ;   Return value in RAX
+
+;
+; Function: EvaluateFeature_Impl2
+;
+00007FFAC1D43450  mov         qword ptr [rsp+8],rbx  
+00007FFAC1D43455  mov         qword ptr [rsp+10h],rbp  
+00007FFAC1D4345A  mov         qword ptr [rsp+18h],rsi  
+00007FFAC1D4345F  push        rdi  
+00007FFAC1D43460  sub         rsp,20h  
+00007FFAC1D43464  mov         rbx,qword ptr [7FFAC1DE18C8h]  
+00007FFAC1D4346B  mov         rbp,r9  
+00007FFAC1D4346E  mov         rsi,r8  
+00007FFAC1D43471  mov         rdi,rdx  
+00007FFAC1D43474  test        rbx,rbx  
+00007FFAC1D43477  jne         00007FFAC1D43480  
+00007FFAC1D43479  mov         eax,0BAD00007h  
+00007FFAC1D4347E  jmp         00007FFAC1D434D1  
+00007FFAC1D43480  test        rdi,rdi  
+00007FFAC1D43483  je          00007FFAC1D434AD  
+00007FFAC1D43485  test        rsi,rsi  
+00007FFAC1D43488  je          00007FFAC1D434AD  
+00007FFAC1D4348A  movsxd      rax,dword ptr [rdx+4]			; Writes '1' to rax
+00007FFAC1D4348E  mov         edx,0BAD00004h			    ; Writes 'BAD00004' to edx
+00007FFAC1D43493  imul        rcx,rax,88h  
+00007FFAC1D4349A  mov         eax,1  
+00007FFAC1D4349F  cmp         qword ptr [rcx+rbx+2490h],0  
+00007FFAC1D434A8  cmove       eax,edx  
+00007FFAC1D434AB  jmp         00007FFAC1D434D1  
+00007FFAC1D434AD  lea         r9,[7FFAC1DB13A8h]  
+00007FFAC1D434B4  mov         edx,256h  
+00007FFAC1D434B9  lea         r8,[7FFAC1DB13D8h]  
+00007FFAC1D434C0  lea         rcx,[7FFAC1DB0FA0h]  
+00007FFAC1D434C7  call        00007FFAC1D3B540  
+00007FFAC1D434CC  mov         eax,0BAD00005h  
+00007FFAC1D434D1  mov         ecx,eax  
+00007FFAC1D434D3  and         ecx,0FFF00000h  
+00007FFAC1D434D9  cmp         ecx,0BAD00000h  
+00007FFAC1D434DF  je          00007FFAC1D4351B  
+00007FFAC1D434E1  movsxd      rax,dword ptr [rdi+4]  
+00007FFAC1D434E5  imul        rcx,rax,88h  
+00007FFAC1D434EC  mov         rbx,qword ptr [rcx+rbx+2490h]  
+00007FFAC1D434F4  mov         rcx,rbx  
+00007FFAC1D434F7  call        qword ptr [7FFAC1D9B5A8h]  
+00007FFAC1D434FD  mov         rcx,qword ptr [rsp+50h]  
+00007FFAC1D43502  mov         r9,rbp  
+00007FFAC1D43505  mov         r8,rsi  
+00007FFAC1D43508  mov         rdx,rdi  
+
+00007FFAC1D4350B  call        rbx					; call EvaluateFeature_Impl3. Important: after this call, RAX = BAD00005
+
+00007FFAC1D4350D  xor         edx,edx  
+00007FFAC1D4350F  mov         rcx,rdi  
+00007FFAC1D43512  mov         ebx,eax  
+00007FFAC1D43514  call        00007FFAC1D129B0  
+00007FFAC1D43519  mov         eax,ebx  
+00007FFAC1D4351B  mov         rbx,qword ptr [rsp+30h]  
+00007FFAC1D43520  mov         rbp,qword ptr [rsp+38h]  
+00007FFAC1D43525  mov         rsi,qword ptr [rsp+40h]  
+00007FFAC1D4352A  add         rsp,20h  
+00007FFAC1D4352E  pop         rdi     ;  Return value in RAX
+00007FFAC1D4352F  ret  
+
+;
+; Function: EvaluateFeature_Impl3
+;
+00007FFA8CC48590  mov         qword ptr [rsp+20h],r9  
+00007FFA8CC48595  push        rbp  
+00007FFA8CC48596  push        rsi  
+00007FFA8CC48597  push        rdi  
+00007FFA8CC48598  sub         rsp,40h  
+00007FFA8CC4859C  mov         qword ptr [rsp+30h],0FFFFFFFFFFFFFFFEh  
+00007FFA8CC485A5  mov         qword ptr [rsp+60h],rbx  
+00007FFA8CC485AA  mov         rdi,r8  
+00007FFA8CC485AD  mov         rbx,rdx  
+00007FFA8CC485B0  mov         rsi,rcx  
+00007FFA8CC485B3  lea         rbp,[7FFA8EF28E70h]  
+00007FFA8CC485BA  mov         qword ptr [rsp+68h],rbp  
+00007FFA8CC485BF  mov         rcx,rbp  
+00007FFA8CC485C2  call        00007FFA8CC87FD4  
+00007FFA8CC485C7  test        eax,eax  
+00007FFA8CC485C9  je          00007FFA8CC485D3  
+00007FFA8CC485CB  mov         ecx,eax  
+00007FFA8CC485CD  call        00007FFA8CC87B70  
+00007FFA8CC485D2  nop  
+00007FFA8CC485D3  mov         r8d,dword ptr [rbx]  
+00007FFA8CC485D6  mov         dword ptr [rsp+78h],r8d  
+00007FFA8CC485DB  movzx       ecx,r8b  
+00007FFA8CC485DF  mov         rax,0CBF29CE484222325h  
+00007FFA8CC485E9  xor         rcx,rax  
+00007FFA8CC485EC  mov         rdx,100000001B3h  
+00007FFA8CC485F6  imul        rcx,rdx  
+00007FFA8CC485FA  movzx       eax,byte ptr [rsp+79h]  
+00007FFA8CC485FF  xor         rcx,rax  
+00007FFA8CC48602  imul        rcx,rdx  
+00007FFA8CC48606  movzx       eax,byte ptr [rsp+7Ah]  
+00007FFA8CC4860B  xor         rcx,rax  
+00007FFA8CC4860E  imul        rcx,rdx  
+00007FFA8CC48612  movzx       eax,byte ptr [rsp+7Bh]  
+00007FFA8CC48617  xor         rcx,rax  
+00007FFA8CC4861A  imul        rcx,rdx  
+00007FFA8CC4861E  and         rcx,qword ptr [7FFA8EF28EF0h]  
+00007FFA8CC48625  mov         rax,rcx  
+00007FFA8CC48628  add         rax,rax  
+00007FFA8CC4862B  mov         r9,qword ptr [7FFA8EF28ED8h]  
+00007FFA8CC48632  mov         rax,qword ptr [r9+rax*8]  
+00007FFA8CC48636  add         rcx,rcx  
+00007FFA8CC48639  lea         r11,[rcx*8+8]  
+00007FFA8CC48641  mov         r10,qword ptr [r9+rcx*8]  
+00007FFA8CC48645  mov         rdx,qword ptr [7FFA8EF28EC8h]  
+00007FFA8CC4864C  nop         dword ptr [rax]  
+00007FFA8CC48650  cmp         r10,rdx  
+00007FFA8CC48653  jne         00007FFA8CC4865A  
+00007FFA8CC48655  mov         rcx,rdx  
+00007FFA8CC48658  jmp         00007FFA8CC48661  
+00007FFA8CC4865A  mov         rcx,qword ptr [r11+r9]  
+00007FFA8CC4865E  mov         rcx,qword ptr [rcx]  
+00007FFA8CC48661  cmp         rax,rcx  
+00007FFA8CC48664  je          00007FFA8CC486A5  
+00007FFA8CC48666  cmp         r8d,dword ptr [rax+10h]  
+00007FFA8CC4866A  je          00007FFA8CC48671  
+00007FFA8CC4866C  mov         rax,qword ptr [rax]  
+00007FFA8CC4866F  jmp         00007FFA8CC48650  
+00007FFA8CC48671  cmovne      rax,rdx  
+00007FFA8CC48675  cmp         rax,rdx  
+00007FFA8CC48678  je          00007FFA8CC486A5  
+00007FFA8CC4867A  mov         rcx,qword ptr [rax+18h]  
+00007FFA8CC4867E  call        00007FFA8CC48CE0   
+00007FFA8CC48683  test        rax,rax  
+00007FFA8CC48686  jne         00007FFA8CC4868F  
+00007FFA8CC48688  mov         ebx,0BAD00002h  
+00007FFA8CC4868D  jmp         00007FFA8CC486C9  
+00007FFA8CC4868F  mov         r9,rdi  
+00007FFA8CC48692  mov         r8,rbx  
+00007FFA8CC48695  mov         rdx,rsi  
+00007FFA8CC48698  mov         rcx,qword ptr [rax+38h]  
+
+00007FFA8CC4869C  call        00007FFA8CC51B30  		; call EvaluateFeature_Impl4. Important: after this call, RAX is 0xBAD00005
+
+00007FFA8CC486A1  mov         ebx,eax  
+00007FFA8CC486A3  jmp         00007FFA8CC486C9  
+00007FFA8CC486A5  lea         r9,[7FFA8CCF92F0h]  
+00007FFA8CC486AC  lea         r8,[7FFA8CCF9340h]  
+00007FFA8CC486B3  mov         edx,0FBh  
+00007FFA8CC486B8  lea         rcx,[7FFA8CCE62C0h]  
+00007FFA8CC486BF  call        00007FFA8CC6FF40
+00007FFA8CC486C4  mov         ebx,0BAD00005h  
+00007FFA8CC486C9  mov         rcx,rbp  
+00007FFA8CC486CC  call        00007FFA8CC87FF8  
+00007FFA8CC486D1  test        eax,eax  
+00007FFA8CC486D3  je          00007FFA8CC486DD  
+00007FFA8CC486D5  mov         ecx,eax  
+00007FFA8CC486D7  call        00007FFA8CC87B70  
+00007FFA8CC486DC  nop  
+00007FFA8CC486DD  mov         eax,ebx  
+00007FFA8CC486DF  mov         rbx,qword ptr [rsp+60h]  
+00007FFA8CC486E4  add         rsp,40h  
+00007FFA8CC486E8  pop         rdi  
+00007FFA8CC486E9  pop         rsi  
+00007FFA8CC486EA  pop         rbp  
+00007FFA8CC486EB  ret  
+
+; 
+; EvaluateFeature_Impl4
+; This fn is really long.
+;
+00007FFA8CC51B30  mov         rax,rsp				; Verified bp hits here.
+00007FFA8CC51B33  push        rbp  
+00007FFA8CC51B34  push        rbx  
+00007FFA8CC51B35  push        rsi  
+00007FFA8CC51B36  push        rdi  
+00007FFA8CC51B37  push        r12  
+00007FFA8CC51B39  push        r13  
+00007FFA8CC51B3B  push        r14  
+00007FFA8CC51B3D  push        r15  
+00007FFA8CC51B3F  lea         rbp,[rax-538h]  
+00007FFA8CC51B46  sub         rsp,5F8h  
+00007FFA8CC51B4D  mov         qword ptr [rbp+1D0h],0FFFFFFFFFFFFFFFEh  
+00007FFA8CC51B58  movaps      xmmword ptr [rax-58h],xmm6  
+00007FFA8CC51B5C  movaps      xmmword ptr [rax-68h],xmm7  
+00007FFA8CC51B60  mov         rax,qword ptr [7FFA8CD1D0C0h]  
+00007FFA8CC51B67  xor         rax,rsp  
+00007FFA8CC51B6A  mov         qword ptr [rbp+4C8h],rax  
+00007FFA8CC51B71  mov         rsi,r9  
+00007FFA8CC51B74  mov         qword ptr [rbp+100h],r8  
+00007FFA8CC51B7B  mov         rdi,rdx  
+00007FFA8CC51B7E  mov         qword ptr [rbp+20h],rdx  
+00007FFA8CC51B82  mov         r15,rcx  
+00007FFA8CC51B85  mov         rdx,qword ptr [r8]  
+00007FFA8CC51B88  mov         qword ptr [rbp+28h],rdx  
+00007FFA8CC51B8C  lea         rbx,[rcx+5B8h]  
+00007FFA8CC51B93  mov         r8,rdx  
+00007FFA8CC51B96  shr         r8,20h  
+00007FFA8CC51B9A  shl         r8d,8  
+00007FFA8CC51B9E  add         r8d,edx  
+00007FFA8CC51BA1  and         r8,qword ptr [rbx+30h]  
+00007FFA8CC51BA5  mov         rax,r8  
+...
+
+;
+; This code validates the create params.
+; It's expecting the InRectSubrectDimensions to not be bigger than InWidth
+;
+00007FFA8CC52B5E  cmovle      rcx,rbx  
+00007FFA8CC52B62  mov         edx,dword ptr [rcx]  
+00007FFA8CC52B64  add         edx,dword ptr [r14+50h]  
+00007FFA8CC52B68  cmp         r10d,edx						; edx = 0x146 = 326		= This comes from NVSDK_NGX_DLSS_Create_Params::Feature::InWidth.
+															; r10d = 0x400 = 1024	= This comes from NVSDK_NGX_D3D12_DLSS_Eval_Params::InRectSubrectDimensions::Width
+															; 1024 > 326, so take the jump
+00007FFA8CC52B6B  jg          00007FFA8CC5380E				; We take this jump
+
+00007FFA8CC5380E  mov         eax,dword ptr [r14+94h]  
+00007FFA8CC53815  test        al,1  
+00007FFA8CC53817  je          00007FFA8CC53954  
+
+00007FFA8CC53954  test        al,4  
+00007FFA8CC53956  je          00007FFA8CC53996				; We don't take this jump
+00007FFA8CC53958  mov         eax,dword ptr [r14+4Ch]  
+00007FFA8CC5395C  mov         dword ptr [rsp+38h],eax  
+00007FFA8CC53960  mov         dword ptr [rsp+30h],r11d  
+00007FFA8CC53965  mov         dword ptr [rsp+28h],r9d  
+00007FFA8CC5396A  mov         dword ptr [rsp+20h],r10d  
+00007FFA8CC5396F  lea         r9,[7FFA8CCFACC0h]  
+00007FFA8CC53976  lea         r8,[7FFA8CCFA410h]  
+00007FFA8CC5397D  mov         edx,359h  
+00007FFA8CC53982  lea         rbx,[7FFA8CCE62C0h]  
+00007FFA8CC53989  mov         rcx,rbx  
+00007FFA8CC5398C  call        00007FFA8CC6FF40				; bp here - Here, it's been determined we've hit an error
+00007FFA8CC53991  jmp         00007FFA8CC53AB1  
+
+00007FFA8CC53AB1  lea         r9,[7FFA8CCFAD90h]  
+00007FFA8CC53AB8  lea         r8,[7FFA8CCFA410h]  
+00007FFA8CC53ABF  mov         edx,364h  
+00007FFA8CC53AC4  mov         rcx,rbx  
+00007FFA8CC53AC7  call        00007FFA8CC6FF70  
+00007FFA8CC53ACC  jmp         00007FFA8CC51E14  
+
+00007FFA8CC51E14  mov         eax,0BAD00005h				; Store bad return value here!
+00007FFA8CC51E19  jmp         00007FFA8CC53B6B  

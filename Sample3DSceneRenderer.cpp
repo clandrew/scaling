@@ -90,6 +90,27 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	{
 		D3D12_RESOURCE_DESC resourceDesc{};
 		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resourceDesc.Width = g_scaling_destWidth;
+		resourceDesc.Height = g_scaling_destHeight;
+		resourceDesc.MipLevels = 1;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		resourceDesc.SampleDesc.Count = 1;
+		resourceDesc.SampleDesc.Quality = 0;
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+		auto defaultHeapType = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+			&defaultHeapType,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&m_dlssTarget)));
+	}
+	{
+		D3D12_RESOURCE_DESC resourceDesc{};
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		resourceDesc.Width = g_scaling_sourceWidth;
 		resourceDesc.Height = g_scaling_sourceHeight;
 		resourceDesc.MipLevels = 1;
@@ -695,20 +716,20 @@ bool Sample3DSceneRenderer::Render()
 
 		NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
 		dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
-		dlssEvalParams.Feature.pInOutput = m_deviceResources->GetSwapChainRenderTarget();
+		dlssEvalParams.Feature.pInOutput = m_dlssTarget.Get();
 		dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
 		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
 		dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
 		dlssEvalParams.pInExposureTexture = nullptr;
-		dlssEvalParams.pInBiasCurrentColorMask = nullptr; // OK to have null?
+		dlssEvalParams.pInBiasCurrentColorMask = nullptr;
 		dlssEvalParams.InJitterOffsetX = 0;
 		dlssEvalParams.InJitterOffsetY = 0;
 		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
 		dlssEvalParams.InReset = m_dlssReset;
 		dlssEvalParams.InMVScaleX = 1.0f;
 		dlssEvalParams.InMVScaleY = 1.0f;
-		dlssEvalParams.InRenderSubrectDimensions.Width = g_scaling_destWidth;
-		dlssEvalParams.InRenderSubrectDimensions.Height = g_scaling_destHeight;
+		dlssEvalParams.InRenderSubrectDimensions.Width = g_scaling_sourceWidth;
+		dlssEvalParams.InRenderSubrectDimensions.Height = g_scaling_sourceHeight;
 
 		Status = NGX_D3D12_EVALUATE_DLSS_EXT(
 			m_commandList.Get(),

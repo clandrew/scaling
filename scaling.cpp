@@ -145,7 +145,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    g_hwnd = hWnd;
 
-   g_deviceResources = std::make_shared<DX::DeviceResources>();
+   g_deviceResources = std::make_shared<DX::DeviceResources>(DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_D32_FLOAT);
    g_deviceResources->SetWindow(hWnd);
    
    g_spinningCubeMain.CreateRenderers(g_deviceResources);
