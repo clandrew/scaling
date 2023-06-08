@@ -66,6 +66,11 @@ void scalingMain::OnDeviceRemoved()
 	m_sceneRenderer = nullptr;
 }
 
+void scalingMain::OnPressSpaceKey()
+{
+	return m_sceneRenderer->OnPressSpaceKey();
+}
+
 void scalingMain::OnPressLeftKey()
 {
 	return m_sceneRenderer->OnPressLeftKey();

@@ -24,6 +24,7 @@ namespace scaling
 		void CreateTargetSizeDependentResources();
 		void Update(DX::StepTimer const& timer);
 		bool Render();
+		void OnPressSpaceKey();
 		void OnPressLeftKey();
 		void OnPressRightKey();
 
@@ -70,6 +71,7 @@ namespace scaling
 		bool	m_tracking;
 
 		ScalingType m_scalingType;
+		bool m_isSpinning;
 	};
 }
 

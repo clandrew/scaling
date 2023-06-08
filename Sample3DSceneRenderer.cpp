@@ -21,7 +21,8 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_tracking(false),
 	m_mappedConstantBuffer(nullptr),
 	m_deviceResources(deviceResources),
-	m_scalingType(ScalingType::Point)
+	m_scalingType(ScalingType::Point),
+	m_isSpinning(true)
 {
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
@@ -121,7 +122,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 	// Create the pipeline state once the shaders are loaded.
 	{
-
 		static const D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -495,7 +495,7 @@ void Sample3DSceneRenderer::CreateTargetSizeDependentResources()
 // Called once per frame, rotates the cube and calculates the model and view matrices.
 void Sample3DSceneRenderer::Update(DX::StepTimer const& timer)
 {
-	if (m_loadingComplete)
+	if (m_loadingComplete && m_isSpinning)
 	{
 		if (!m_tracking)
 		{
@@ -645,6 +645,11 @@ void Sample3DSceneRenderer::UpdateWindowTitleText()
 		titleText = L"Scaling type: <error>";
 	}
 	SetWindowText(m_deviceResources->GetWindow(), titleText);
+}
+
+void Sample3DSceneRenderer::OnPressSpaceKey()
+{
+	m_isSpinning = !m_isSpinning;
 }
 
 void Sample3DSceneRenderer::OnPressLeftKey()

@@ -209,7 +209,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
     case WM_KEYDOWN:
         {
-            if (wParam == 37)
+            if (wParam == 32)
+            {
+                g_spinningCubeMain.OnPressSpaceKey();
+            }
+            else if (wParam == 37)
             {
                 g_spinningCubeMain.OnPressLeftKey();
             }
