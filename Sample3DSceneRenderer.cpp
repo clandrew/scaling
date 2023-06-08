@@ -386,10 +386,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		{
 		VertexUV quadVertices[] =
 			{
-				{ XMFLOAT3(-1, -1, 1), XMFLOAT2(0.0f, 0.0f) }, // Top left
-				{ XMFLOAT3(1,  -1, 1), XMFLOAT2(1.0f, 0.0f) }, // Top right
-				{ XMFLOAT3(-1,  1, 1), XMFLOAT2(0.0f, 1.0f) }, // Bottom left
-				{ XMFLOAT3(1,   1, 1), XMFLOAT2(1.0f, 1.0f) }, // Bottom right
+				{ XMFLOAT3(-1, -1, 1), XMFLOAT2(0.0f, 1.0f) }, // Top left
+				{ XMFLOAT3(1,  -1, 1), XMFLOAT2(1.0f, 1.0f) }, // Top right
+				{ XMFLOAT3(-1,  1, 1), XMFLOAT2(0.0f, 0.0f) }, // Bottom left
+				{ XMFLOAT3(1,   1, 1), XMFLOAT2(1.0f, 0.0f) }, // Bottom right
 			};
 			const UINT quadVertexBufferSize = sizeof(quadVertices);
 
@@ -800,7 +800,7 @@ void Sample3DSceneRenderer::OnPressLeftKey()
 {
 	if (m_scalingType == ScalingType::Point)
 	{
-		m_scalingType = ScalingType::Linear; // The last one
+		m_scalingType = static_cast<ScalingType>(static_cast<int>(ScalingType::NumScalingTypes) - 1); // The last one
 	}
 	else
 	{
@@ -811,7 +811,7 @@ void Sample3DSceneRenderer::OnPressLeftKey()
 
 void Sample3DSceneRenderer::OnPressRightKey()
 {
-	if (m_scalingType == ScalingType::Linear)
+	if (static_cast<int>(m_scalingType) == static_cast<int>(ScalingType::NumScalingTypes) - 1)
 	{
 		m_scalingType = ScalingType::Point; // The first one
 	}
