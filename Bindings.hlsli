@@ -16,4 +16,5 @@ ConstantBuffer<DrawConstantsType> drawConstants : register(b1);
 
 Texture2D g_inputTexture : register(t0);
 
-SamplerState g_samplers[2] : register(s0);
+SamplerState g_sampler0 : register(s0);
+SamplerState g_sampler1 : register(s1);
