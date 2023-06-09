@@ -185,7 +185,7 @@ void DX::DeviceResources::CreateDeviceResources()
 void DX::DeviceResources::CreateTargetSizeDependentResources()
 {
 	// Wait until all previous GPU work is complete.
-	WaitForGpu();
+	WaitForGpuOnDirectQueue();
 
 	// Clear the previous window size specific content and update the tracked fence values.
 	for (UINT n = 0; n < c_frameCount; n++)
@@ -394,11 +394,10 @@ void DX::DeviceResources::Present()
 	}
 }
 
-// Wait for pending GPU work to complete.
-void DX::DeviceResources::WaitForGpu()
+void DX::DeviceResources::WaitForGpuImpl(ID3D12CommandQueue* pQueue)
 {
 	// Schedule a Signal command in the queue.
-	DX::ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValues[m_currentFrame]));
+	DX::ThrowIfFailed(pQueue->Signal(m_fence.Get(), m_fenceValues[m_currentFrame]));
 
 	// Wait until the fence has been crossed.
 	DX::ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_currentFrame], m_fenceEvent));
@@ -409,17 +408,15 @@ void DX::DeviceResources::WaitForGpu()
 }
 
 // Wait for pending GPU work to complete.
-void DX::DeviceResources::WaitForVideo()
+void DX::DeviceResources::WaitForGpuOnDirectQueue()
 {
-	// Schedule a Signal command in the queue.
-	DX::ThrowIfFailed(m_videoQueue->Signal(m_fence.Get(), m_videoFenceValue));
+	WaitForGpuImpl(m_commandQueue.Get());
+}
 
-	// Wait until the fence has been crossed.
-	DX::ThrowIfFailed(m_fence->SetEventOnCompletion(m_videoFenceValue, m_fenceEvent));
-	WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-
-	// Increment the fence value for the current frame.
-	m_videoFenceValue++;
+// Wait for pending GPU work to complete.
+void DX::DeviceResources::WaitForGpuOnVideoQueue()
+{
+	WaitForGpuImpl(m_videoQueue.Get());
 }
 
 // Prepare to render the next frame.

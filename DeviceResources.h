@@ -29,8 +29,8 @@ namespace DX
 		void SetLogicalSize(SizeF logicalSize);
 		void ValidateDevice();
 		void Present();
-		void WaitForGpu();
-		void WaitForVideo();
+		void WaitForGpuOnDirectQueue();
+		void WaitForGpuOnVideoQueue();
 
 		bool						IsDeviceRemoved() const				{ return m_deviceRemoved; }
 
@@ -79,6 +79,7 @@ namespace DX
 		void CreateTargetSizeDependentResources();
 		void MoveToNextFrame();
 		void GetHardwareAdapter(IDXGIAdapter1** ppAdapter);
+		void WaitForGpuImpl(ID3D12CommandQueue* pQueue);
 
 
 		// Direct3D objects.

@@ -684,7 +684,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
-		m_deviceResources->WaitForGpu();
+		m_deviceResources->WaitForGpuOnDirectQueue();
 
 		DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
 	};
@@ -917,7 +917,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 			m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 		}
 
-		m_deviceResources->WaitForGpu(); // Wait for graphics conversion to finish
+		m_deviceResources->WaitForGpuOnDirectQueue(); // Wait for graphics conversion to finish
 
 		DX::ThrowIfFailed(m_deviceResources->GetVideoEncodeCommandAllocator()->Reset());
 		DX::ThrowIfFailed(m_videoEncodeCommandList->Reset(m_deviceResources->GetVideoEncodeCommandAllocator()));
@@ -994,7 +994,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 			ID3D12CommandList* ppCommandLists[] = { m_videoEncodeCommandList.Get() };
 			m_deviceResources->GetVideoQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 		}
-		m_deviceResources->WaitForVideo();
+		m_deviceResources->WaitForGpuOnVideoQueue();
 
 		// Reopen the graphics command list
 		DX::ThrowIfFailed(m_deviceResources->GetDirectCommandAllocator()->Reset());

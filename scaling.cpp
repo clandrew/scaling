@@ -77,8 +77,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         g_spinningCubeMain.RenderAndPresent();
 	}
 
-	g_deviceResources->WaitForGpu();
-
     return (int) msg.wParam;
 }
 
