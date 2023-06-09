@@ -1048,6 +1048,30 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
+		// Copy current motion vectors to previous
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		m_commandList->CopyResource(m_previousYuv.Get(), m_currentYuv.Get());
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+
 		DX::ThrowIfFailed(m_commandList->Close());
 
 		// Execute the command list.
