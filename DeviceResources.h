@@ -73,20 +73,6 @@ namespace DX
 			return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 		}
 
-		bool											m_deviceRemoved;
-		UINT											m_currentFrame;
-
-		// CPU/GPU Synchronization.
-		Microsoft::WRL::ComPtr<ID3D12Fence>				m_fence;
-		UINT64											m_fenceValues[c_frameCount];
-		HANDLE											m_fenceEvent;
-
-		UINT64											m_videoFenceValue;
-
-		Microsoft::WRL::ComPtr<IDXGISwapChain3>			m_swapChain;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_commandQueue;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_videoQueue;
-
 	private:
 		void CreateDeviceIndependentResources();
 		void CreateDeviceResources();
@@ -117,6 +103,19 @@ namespace DX
 		
 		UINT											m_rtvDescriptorSize;
 
+		bool											m_deviceRemoved;
+		UINT											m_currentFrame;
+
+		// CPU/GPU Synchronization.
+		Microsoft::WRL::ComPtr<ID3D12Fence>				m_fence;
+		UINT64											m_fenceValues[c_frameCount];
+		HANDLE											m_fenceEvent;
+
+		UINT64											m_videoFenceValue;
+
+		Microsoft::WRL::ComPtr<IDXGISwapChain3>			m_swapChain;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_commandQueue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_videoQueue;
 
 		// Cached reference to the Window.
 		HWND											m_window;

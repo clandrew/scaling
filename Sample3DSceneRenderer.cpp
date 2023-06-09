@@ -758,7 +758,6 @@ void Sample3DSceneRenderer::Rotate(float radians)
 // Renders one frame using the vertex and pixel shaders.
 bool Sample3DSceneRenderer::RenderAndPresent()
 {
-	// Loading is asynchronous. Only draw geometry after it's loaded.
 	if (!m_loadingComplete)
 	{
 		return false;
@@ -1078,38 +1077,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-		// The first argument instructs DXGI to block until VSync, putting the application
-		// to sleep until the next VSync. This ensures we don't waste any cycles rendering
-		// frames that will never be displayed to the screen.
-		HRESULT hr = m_deviceResources->GetSwapChain()->Present(1, 0);
-
-		// If the device was removed either by a disconnection or a driver upgrade, we 
-		// must recreate all device resources.
-		if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
-		{
-			m_deviceResources->m_deviceRemoved = true;
-		}
-		else
-		{
-			DX::ThrowIfFailed(hr);
-
-			// Schedule a Signal command in the queue.
-			const UINT64 currentFenceValue = m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame];
-			DX::ThrowIfFailed(m_deviceResources->m_commandQueue->Signal(m_deviceResources->m_fence.Get(), currentFenceValue));
-
-			// Advance the frame index.
-			m_deviceResources->m_currentFrame = m_deviceResources->m_swapChain->GetCurrentBackBufferIndex();
-
-			// Check to see if the next frame is ready to start.
-			if (m_deviceResources->m_fence->GetCompletedValue() < m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame])
-			{
-				DX::ThrowIfFailed(m_deviceResources->m_fence->SetEventOnCompletion(m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame], m_deviceResources->m_fenceEvent));
-				WaitForSingleObjectEx(m_deviceResources->m_fenceEvent, INFINITE, FALSE);
-			}
-
-			// Set the fence value for the next frame.
-			m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame] = currentFenceValue + 1;
-		}
+		m_deviceResources->Present();
 	}
 
 	return true;
