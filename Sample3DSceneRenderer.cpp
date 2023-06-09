@@ -1150,6 +1150,130 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 	}
 	else
 	{
+		assert(m_scalingType == ScalingType::XeSS);
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		// Convert Rgb to Yuv because motion estimation requires yuv
+		{
+			m_commandList->SetPipelineState(m_pass2_YuvConversion_PipelineState.Get());
+
+			// First half of descriptor table is graphics stuff, second half is compute. Select the compute items
+			CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 4, m_cbvDescriptorSize);
+			m_commandList->SetComputeRootDescriptorTable(0, gpuHandle);
+			UINT rootConstants[2] = { static_cast<UINT>(g_scaling_sourceWidth), static_cast<UINT>(g_scaling_sourceHeight) };
+			m_commandList->SetComputeRoot32BitConstants(1, 2, rootConstants, 0);
+
+			UINT dispatchX = static_cast<UINT>(g_scaling_sourceWidth) / 64 + 1;
+			UINT dispatchY = g_scaling_sourceHeight;
+			m_commandList->Dispatch(dispatchX, dispatchY, 1);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		DX::ThrowIfFailed(m_commandList->Close());
+
+		{
+			ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+			m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		}
+
+		m_deviceResources->WaitForGpuOnDirectQueue(); // Wait for graphics conversion to finish
+
+		DX::ThrowIfFailed(m_deviceResources->GetVideoEncodeCommandAllocator()->Reset());
+		DX::ThrowIfFailed(m_videoEncodeCommandList->Reset(m_deviceResources->GetVideoEncodeCommandAllocator()));
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		// Run motion estimation
+		{
+			const D3D12_VIDEO_MOTION_ESTIMATOR_INPUT inputArgs = {
+				m_currentYuv.Get(),
+				0,
+				m_previousYuv.Get(),
+				0,
+				nullptr // pHintMotionVectorHeap
+			};
+
+			const D3D12_VIDEO_MOTION_ESTIMATOR_OUTPUT outputArgs = { m_videoMotionVectorHeap.Get() };
+
+			m_videoEncodeCommandList->EstimateMotion(m_videoMotionEstimator.Get(), &outputArgs, &inputArgs);
+		}
+		// Resolve motion vectors
+		{
+			D3D12_RESOLVE_VIDEO_MOTION_VECTOR_HEAP_INPUT inputArgs =
+			{
+				m_videoMotionVectorHeap.Get(),
+				g_scaling_sourceWidth,
+				g_scaling_sourceHeight
+			};
+
+			D3D12_RESOURCE_COORDINATE ouputCoordinate{};
+
+			D3D12_RESOLVE_VIDEO_MOTION_VECTOR_HEAP_OUTPUT outputArgs =
+			{
+				m_motionVectors.Get(),
+				ouputCoordinate
+			};
+
+			m_videoEncodeCommandList->ResolveMotionVectorHeap(&outputArgs, &inputArgs);
+		}
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
+
+		{
+			ID3D12CommandList* ppCommandLists[] = { m_videoEncodeCommandList.Get() };
+			m_deviceResources->GetVideoQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		}
+		m_deviceResources->WaitForGpuOnVideoQueue();
+
+		// Reopen the graphics command list
+		DX::ThrowIfFailed(m_deviceResources->GetDirectCommandAllocator()->Reset());
+		DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetDirectCommandAllocator(), nullptr));
+
+
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -1171,7 +1295,6 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
-		assert(m_scalingType == ScalingType::XeSS);
 		xess_d3d12_execute_params_t exec_params{};
 		exec_params.inputWidth = g_scaling_sourceWidth;
 		exec_params.inputHeight = g_scaling_sourceHeight;
@@ -1207,6 +1330,30 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
+
+		// Copy current motion vectors to previous
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		m_commandList->CopyResource(m_previousYuv.Get(), m_currentYuv.Get());
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
