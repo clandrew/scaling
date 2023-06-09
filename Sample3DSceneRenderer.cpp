@@ -28,7 +28,7 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_scalingType(ScalingType::XeSS),
 	m_isSpinning(true),
 	m_dlssSupported(false),
-	m_dlssSharpness(1.0f),
+	m_dlssSharpness(0.5f),
 	m_dlssReset(0)
 {
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
@@ -158,7 +158,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	xessResult = xessGetIntelXeFXVersion(m_xessContext, &xefx_version);
 	DX::ThrowIfXeSSFailed(xessResult);
 
-	const xess_quality_settings_t quality = XESS_QUALITY_SETTING_PERFORMANCE;
+	const xess_quality_settings_t quality = XESS_QUALITY_SETTING_ULTRA_QUALITY;
 
 	desiredOutputResolution.x = g_scaling_destWidth;
 	desiredOutputResolution.y = g_scaling_destHeight;
