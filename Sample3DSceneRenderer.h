@@ -48,7 +48,9 @@ namespace scaling
 		UINT8*												m_mappedConstantBuffer;
 		UINT												m_cbvDescriptorSize;
 
-		Microsoft::WRL::ComPtr<ID3D12RootSignature>			m_commonRootSignature;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature>			m_commonGraphicsRootSignature;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature>			m_commonComputeRootSignature;
+
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		m_cbvSrvHeap;
 
 		D3D12_RECT											m_pass1ScissorRect;
@@ -59,7 +61,7 @@ namespace scaling
 		D3D12_INDEX_BUFFER_VIEW								m_spinningCubeIndexBufferView;
 
 		D3D12_RECT											m_pass2ScissorRect;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pass2PipelineState;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState>			m_pass2_TexturedQuad_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadVertexBuffer;
 		Microsoft::WRL::ComPtr<ID3D12Resource>				m_texturedQuadIndexBuffer;
 		D3D12_VERTEX_BUFFER_VIEW							m_texturedQuadVertexBufferView;
@@ -75,13 +77,19 @@ namespace scaling
 		bool m_isSpinning;
 
 		// DLSS-related things
-		bool                                                m_dlssSupported;
-		NVSDK_NGX_Parameter*                                m_ngxParameters{};
-		NVSDK_NGX_Handle*                                   m_dlssFeatureHandle;
-		float                                               m_dlssSharpness;
-		int												    m_dlssReset;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				m_motionVectors;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				m_dlssTarget;
+		Microsoft::WRL::ComPtr<ID3D12VideoEncodeCommandList> m_videoEncodeCommandList;
+		Microsoft::WRL::ComPtr<ID3D12VideoMotionEstimator>   m_videoMotionEstimator;
+		Microsoft::WRL::ComPtr<ID3D12VideoMotionVectorHeap>  m_videoMotionVectorHeap;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState>		     m_pass2_YuvConversion_PipelineState;
+		bool                                                 m_dlssSupported;
+		NVSDK_NGX_Parameter*                                 m_ngxParameters{};
+		NVSDK_NGX_Handle*                                    m_dlssFeatureHandle;
+		float                                                m_dlssSharpness;
+		int												     m_dlssReset;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_motionVectors;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_currentYuv;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_previousYuv;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_dlssTarget;
 	};
 }
 

@@ -254,7 +254,7 @@ void DX::DeviceResources::CreateTargetSizeDependentResources()
 	// Create intermediate render target and view for it.
 	{
 		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_B8G8R8A8_UNORM, g_scaling_sourceWidth, g_scaling_sourceHeight, 1, 1);
-		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 		float cornflowerBlue[] = { 0.3f, 0.58f, 0.93f, 1.0f };
 		CD3DX12_CLEAR_VALUE clearValue(DXGI_FORMAT_B8G8R8A8_UNORM, cornflowerBlue);

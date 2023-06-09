@@ -90,6 +90,7 @@ namespace DX
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_dsvHeap;
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_commandQueue;
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>	m_commandAllocators[c_frameCount];
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>  m_videoEncodeCommandAllocator;
 		DXGI_FORMAT										m_backBufferFormat;
 		DXGI_FORMAT										m_depthBufferFormat;
 

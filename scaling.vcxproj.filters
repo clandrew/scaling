@@ -119,10 +119,13 @@
     <FxCompile Include="Pass1VS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Pass2VS.hlsl">
+    <FxCompile Include="Pass2_TexturedQuadVS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Pass2PS.hlsl">
+    <FxCompile Include="Pass2_TexturedQuadPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Pass2_RgbToYuvCS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

@@ -8,8 +8,9 @@
 
 #include "Pass1VS.h"
 #include "Pass1PS.h"
-#include "Pass2VS.h"
-#include "Pass2PS.h"
+#include "Pass2_RgbToYuvCS.h"
+#include "Pass2_TexturedQuadVS.h"
+#include "Pass2_TexturedQuadPS.h"
 
 using namespace scaling;
 
@@ -48,45 +49,90 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 {
 	auto d3dDevice = m_deviceResources->GetD3DDevice();
 
-	// Create a command list.
+	// Create command lists
 	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 	NAME_D3D12_OBJECT(m_commandList);
 
+	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, m_deviceResources->GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_videoEncodeCommandList)));
+	NAME_D3D12_OBJECT(m_videoEncodeCommandList);
 
-	NVSDK_NGX_Result Status = NVSDK_NGX_D3D12_Init(12341234, L"./", d3dDevice);
-	DX::ThrowIfNGXFailed(Status);
-
-	Status = NVSDK_NGX_D3D12_GetCapabilityParameters(&m_ngxParameters);
-	DX::ThrowIfNGXFailed(Status);
-
-	int DLSSAvailable = 0;
-	Status = m_ngxParameters->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &DLSSAvailable);
-	DX::ThrowIfNGXFailed(Status);
-	m_dlssSupported = DLSSAvailable > 0;
-
+	bool motionEstimationSupported = false;
+	ComPtr<ID3D12VideoDevice1> videoDevice;
+	if (SUCCEEDED(d3dDevice->QueryInterface(IID_PPV_ARGS(&videoDevice))))
 	{
-		int DlssCreateFeatureFlags = NVSDK_NGX_DLSS_Feature_Flags_None;
-
-		NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
-		dlssCreateParams.Feature.InTargetWidth = g_scaling_destWidth;
-		dlssCreateParams.Feature.InTargetHeight = g_scaling_destHeight;
-		dlssCreateParams.Feature.InWidth = g_scaling_sourceWidth;
-		dlssCreateParams.Feature.InHeight = g_scaling_sourceHeight;
-		dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
-		dlssCreateParams.InFeatureCreateFlags = DlssCreateFeatureFlags;
-
-		UINT creationNodeMask = 1;
-		UINT visibilityNodeMask = 1;
-		Status = NGX_D3D12_CREATE_DLSS_EXT(
-			m_commandList.Get(),
-			creationNodeMask,
-			visibilityNodeMask,
-			&m_dlssFeatureHandle,
-			m_ngxParameters,
-			&dlssCreateParams);
-
-		DX::ThrowIfNGXFailed(Status);
+		D3D12_FEATURE_DATA_VIDEO_MOTION_ESTIMATOR motionEstimatorSupport = { 0u, DXGI_FORMAT_NV12 };
+		if (SUCCEEDED(videoDevice->CheckFeatureSupport(D3D12_FEATURE_VIDEO_MOTION_ESTIMATOR, &motionEstimatorSupport, sizeof(motionEstimatorSupport))))
+		{
+			motionEstimationSupported = true;
+		}
 	}
+
+	NVSDK_NGX_Result Status{};
+
+	if (motionEstimationSupported)
+	{
+		NVSDK_NGX_Result Status = NVSDK_NGX_D3D12_Init(12341234, L"./", d3dDevice);
+		DX::ThrowIfNGXFailed(Status);
+
+		Status = NVSDK_NGX_D3D12_GetCapabilityParameters(&m_ngxParameters);
+		DX::ThrowIfNGXFailed(Status);
+
+		int DLSSAvailable = 0;
+		Status = m_ngxParameters->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &DLSSAvailable);
+		DX::ThrowIfNGXFailed(Status);
+		m_dlssSupported = DLSSAvailable > 0;
+
+		{
+			int DlssCreateFeatureFlags = NVSDK_NGX_DLSS_Feature_Flags_None;
+
+			NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
+			dlssCreateParams.Feature.InTargetWidth = g_scaling_destWidth;
+			dlssCreateParams.Feature.InTargetHeight = g_scaling_destHeight;
+			dlssCreateParams.Feature.InWidth = g_scaling_sourceWidth;
+			dlssCreateParams.Feature.InHeight = g_scaling_sourceHeight;
+			dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
+			dlssCreateParams.InFeatureCreateFlags = DlssCreateFeatureFlags;
+
+			UINT creationNodeMask = 1;
+			UINT visibilityNodeMask = 1;
+			Status = NGX_D3D12_CREATE_DLSS_EXT(
+				m_commandList.Get(),
+				creationNodeMask,
+				visibilityNodeMask,
+				&m_dlssFeatureHandle,
+				m_ngxParameters,
+				&dlssCreateParams);
+
+			DX::ThrowIfNGXFailed(Status);
+		}
+
+		D3D12_VIDEO_MOTION_ESTIMATOR_DESC motionEstimatorDesc = {
+			0, //NodeIndex
+			DXGI_FORMAT_NV12,
+			D3D12_VIDEO_MOTION_ESTIMATOR_SEARCH_BLOCK_SIZE_16X16,
+			D3D12_VIDEO_MOTION_ESTIMATOR_VECTOR_PRECISION_QUARTER_PEL,
+			{g_scaling_sourceWidth, g_scaling_sourceHeight, g_scaling_sourceWidth, g_scaling_sourceHeight} // D3D12_VIDEO_SIZE_RANGE
+		};
+
+		DX::ThrowIfFailed(videoDevice->CreateVideoMotionEstimator(
+			&motionEstimatorDesc,
+			nullptr,
+			IID_PPV_ARGS(&m_videoMotionEstimator)));
+
+		D3D12_VIDEO_MOTION_VECTOR_HEAP_DESC motionVectorHeapDesc = {
+			0, // NodeIndex 
+			DXGI_FORMAT_NV12,
+			D3D12_VIDEO_MOTION_ESTIMATOR_SEARCH_BLOCK_SIZE_16X16,
+			D3D12_VIDEO_MOTION_ESTIMATOR_VECTOR_PRECISION_QUARTER_PEL,
+			{g_scaling_sourceWidth, g_scaling_sourceHeight, g_scaling_sourceWidth, g_scaling_sourceHeight} // D3D12_VIDEO_SIZE_RANGE
+		};
+
+		videoDevice->CreateVideoMotionVectorHeap(
+			&motionVectorHeapDesc,
+			nullptr,
+			IID_PPV_ARGS(&m_videoMotionVectorHeap));
+	}
+
 	{
 		D3D12_RESOURCE_DESC resourceDesc{};
 		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -128,9 +174,46 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			nullptr,
 			IID_PPV_ARGS(&m_motionVectors)));
 	}
+	{
+		D3D12_RESOURCE_DESC resourceDesc{};
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		
+		resourceDesc.Width = g_scaling_sourceWidth;
+		assert(resourceDesc.Width % 2 == 0); // NV12 needs to have multiple-of-two size.
+
+		resourceDesc.Height = g_scaling_sourceHeight;
+		assert(resourceDesc.Height % 2 == 0);
+
+		resourceDesc.MipLevels = 1;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.Format = DXGI_FORMAT_NV12;
+		resourceDesc.SampleDesc.Count = 1;
+		resourceDesc.SampleDesc.Quality = 0;
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+		auto defaultHeapType = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+			&defaultHeapType,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			nullptr,
+			IID_PPV_ARGS(&m_currentYuv)));
+		DX::SetName(m_currentYuv.Get(), L"m_yuv");
+
+		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
+			&defaultHeapType,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			nullptr,
+			IID_PPV_ARGS(&m_previousYuv)));
+		DX::SetName(m_currentYuv.Get(), L"m_previousYuv");
+	}
 
 	DX::ThrowIfNGXFailed(Status);
 
+	// Graphics root sig
 	{
 		CD3DX12_DESCRIPTOR_RANGE ranges[2];
 		CD3DX12_ROOT_PARAMETER parameters[2];
@@ -205,8 +288,37 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			OutputDebugStringA(reinterpret_cast<char*>(pError->GetBufferPointer()));
 			_com_issue_error(serializeRootSignatureHR);
 		}
-		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonRootSignature)));
-        NAME_D3D12_OBJECT(m_commonRootSignature);
+		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonGraphicsRootSignature)));
+        NAME_D3D12_OBJECT(m_commonGraphicsRootSignature);
+	}
+
+	// Compute root sig
+	{
+		CD3DX12_DESCRIPTOR_RANGE ranges[1];
+		CD3DX12_ROOT_PARAMETER parameters[2];
+
+		UINT descriptorCount = 3;
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, descriptorCount, 0);
+
+		parameters[0].InitAsDescriptorTable(_countof(ranges), ranges);
+		parameters[1].InitAsConstants(2, 0);
+
+		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
+
+		CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
+		descRootSignature.Init(_countof(parameters), parameters, 0, nullptr, rootSignatureFlags);
+
+		ComPtr<ID3DBlob> pSignature;
+		ComPtr<ID3DBlob> pError;
+
+		HRESULT serializeRootSignatureHR = D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, pSignature.GetAddressOf(), pError.GetAddressOf());
+		if (FAILED(serializeRootSignatureHR))
+		{
+			OutputDebugStringA(reinterpret_cast<char*>(pError->GetBufferPointer()));
+			_com_issue_error(serializeRootSignatureHR);
+		}
+		DX::ThrowIfFailed(d3dDevice->CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), IID_PPV_ARGS(&m_commonComputeRootSignature)));
+		NAME_D3D12_OBJECT(m_commonComputeRootSignature);
 	}
 
 	// Create the pipeline state once the shaders are loaded.
@@ -219,7 +331,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_commonRootSignature.Get();
+		state.pRootSignature = m_commonGraphicsRootSignature.Get();
         state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1VS), _countof(g_Pass1VS));
         state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass1PS), _countof(g_Pass1PS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -244,9 +356,9 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
-		state.pRootSignature = m_commonRootSignature.Get();
-		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2VS), _countof(g_Pass2VS));
-		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2PS), _countof(g_Pass2PS));
+		state.pRootSignature = m_commonGraphicsRootSignature.Get();
+		state.VS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2_TexturedQuadVS), _countof(g_Pass2_TexturedQuadVS));
+		state.PS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2_TexturedQuadPS), _countof(g_Pass2_TexturedQuadPS));
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -257,8 +369,14 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		state.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		state.SampleDesc.Count = 1;
 
-		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pass2PipelineState)));
+		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&m_pass2_TexturedQuad_PipelineState)));
 	};
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDesc{};
+		pipelineStateDesc.pRootSignature = m_commonComputeRootSignature.Get();
+		pipelineStateDesc.CS = CD3DX12_SHADER_BYTECODE((void*)(g_Pass2_RgbToYuvCS), _countof(g_Pass2_RgbToYuvCS));
+		DX::ThrowIfFailed(m_deviceResources->GetD3DDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&m_pass2_YuvConversion_PipelineState)));
+	}
 
 	// Create and upload cube and quad geometry resources to the GPU.
 	{
@@ -472,8 +590,18 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Create a descriptor heap for the constant buffers and SRV.
 		{
+			// Descriptor table has these contents:
+
+			// frame 0 graphics constants
+			// frame 1 graphics constants
+			// frame 2 graphics constants
+			// intermediate srv
+			// intermediate uav rgb source
+			// intermediate uav luminance plane
+			// intermediate uav chrominance plane
+
 			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-			heapDesc.NumDescriptors = DX::c_frameCount + 1;
+			heapDesc.NumDescriptors = DX::c_frameCount + 4;
 			heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 			// This flag indicates that this descriptor heap can be bound to the pipeline and that descriptors contained in it can be referenced by a root table.
 			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -517,7 +645,30 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvDesc.Texture2D.MipLevels = 1;
 			d3dDevice->CreateShaderResourceView(m_deviceResources->GetIntermediateRenderTarget(), &srvDesc, cbvSrvCpuHandle);
-
+			cbvSrvCpuHandle.Offset(m_cbvDescriptorSize);
+		}
+		// Create UAV for rgb source
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			d3dDevice->CreateUnorderedAccessView(m_deviceResources->GetIntermediateRenderTarget(), nullptr, &uavDesc, cbvSrvCpuHandle);
+			cbvSrvCpuHandle.Offset(m_cbvDescriptorSize);
+		}
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_R8_UNORM; // Selects the luminance plane
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			d3dDevice->CreateUnorderedAccessView(m_currentYuv.Get(), nullptr, &uavDesc, cbvSrvCpuHandle);
+			cbvSrvCpuHandle.Offset(m_cbvDescriptorSize);
+		}
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_R8G8_UNORM; // Selects the chrominance plane
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			uavDesc.Texture2D.PlaneSlice = 1;
+			d3dDevice->CreateUnorderedAccessView(m_currentYuv.Get(), nullptr, &uavDesc, cbvSrvCpuHandle);
+			cbvSrvCpuHandle.Offset(m_cbvDescriptorSize);
 		}
 
 		// Map the constant buffers.
@@ -618,7 +769,8 @@ bool Sample3DSceneRenderer::Render()
 	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap.Get() };
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-	m_commandList->SetGraphicsRootSignature(m_commonRootSignature.Get());
+	m_commandList->SetGraphicsRootSignature(m_commonGraphicsRootSignature.Get());
+	m_commandList->SetComputeRootSignature(m_commonComputeRootSignature.Get());
 	
 	// Set root params
 	{
@@ -673,7 +825,7 @@ bool Sample3DSceneRenderer::Render()
 	// Pass 2
 	if (m_scalingType == ScalingType::Point || m_scalingType == ScalingType::Linear)
 	{
-		m_commandList->SetPipelineState(m_pass2PipelineState.Get());
+		m_commandList->SetPipelineState(m_pass2_TexturedQuad_PipelineState.Get());
 
 		// Set the viewport and scissor rectangle.
 		D3D12_VIEWPORT pass2Viewport = m_deviceResources->GetPass2Viewport();
@@ -717,6 +869,38 @@ bool Sample3DSceneRenderer::Render()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
+
+
+		// Convert Rgb to Yuv because motion estimation requires yuv
+		{
+			m_commandList->SetPipelineState(m_pass2_YuvConversion_PipelineState.Get());
+
+			// First half of descriptor table is graphics stuff, second half is compute. Select the compute items
+			CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 4, m_cbvDescriptorSize);
+			m_commandList->SetComputeRootDescriptorTable(0, gpuHandle);
+			UINT rootConstants[2] = { static_cast<UINT>(g_scaling_sourceWidth), static_cast<UINT>(g_scaling_sourceHeight) };
+			m_commandList->SetComputeRoot32BitConstants(1, 2, rootConstants, 0);
+
+			UINT dispatchX = static_cast<UINT>(g_scaling_sourceWidth) / 64 + 1;
+			UINT dispatchY = g_scaling_sourceHeight;
+			m_commandList->Dispatch(dispatchX, dispatchY, 1);
+		}
+
+		// Run motion estimation
+		{
+			const D3D12_VIDEO_MOTION_ESTIMATOR_INPUT inputArgs = {
+				m_currentYuv.Get(),
+				0,
+				m_previousYuv.Get(),
+				0,
+				nullptr // pHintMotionVectorHeap
+			};
+
+			const D3D12_VIDEO_MOTION_ESTIMATOR_OUTPUT outputArgs = { m_videoMotionVectorHeap.Get() };
+
+			//m_commandList->EstimateMotion(m_videoMotionEstimator.Get(), &outputArgs, &inputArgs);
+		}
+
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_dlssTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -763,8 +947,6 @@ bool Sample3DSceneRenderer::Render()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
-
-		// Here: copy from m_dlssTarget to swapchain
 	}
 
 	DX::ThrowIfFailed(m_commandList->Close());

@@ -11,6 +11,7 @@
 #include "framework.h"
 
 #include <d3d12.h>
+#include <d3d12video.h>
 #include <dxgi1_6.h>
 #include <initguid.h>
 #include <dxgidebug.h>
