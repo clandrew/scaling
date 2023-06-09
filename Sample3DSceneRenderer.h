@@ -24,7 +24,7 @@ namespace scaling
 		void CreateDeviceDependentResources();
 		void CreateTargetSizeDependentResources();
 		void Update(DX::StepTimer const& timer);
-		bool Render();
+		bool RenderAndPresent();
 		void OnPressSpaceKey();
 		void OnPressLeftKey();
 		void OnPressRightKey();

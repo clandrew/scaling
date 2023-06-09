@@ -30,6 +30,7 @@ namespace DX
 		void ValidateDevice();
 		void Present();
 		void WaitForGpu();
+		void WaitForVideo();
 
 		bool						IsDeviceRemoved() const				{ return m_deviceRemoved; }
 
@@ -44,7 +45,11 @@ namespace DX
 
 		ID3D12Resource*				GetDepthStencil() const				{ return m_depthStencil.Get(); }
 		ID3D12CommandQueue*			GetCommandQueue() const				{ return m_commandQueue.Get(); }
-		ID3D12CommandAllocator*		GetCommandAllocator() const			{ return m_commandAllocators[m_currentFrame].Get(); }
+		ID3D12CommandQueue*			GetVideoQueue() const				{ return m_videoQueue.Get(); }
+
+		ID3D12CommandAllocator*		GetDirectCommandAllocator() const		{ return m_commandAllocators[m_currentFrame].Get(); }
+		ID3D12CommandAllocator*		GetVideoEncodeCommandAllocator() const	{ return m_videoEncodeCommandAllocator.Get(); }
+		
 		DXGI_FORMAT					GetBackBufferFormat() const			{ return m_backBufferFormat; }
 		DXGI_FORMAT					GetDepthBufferFormat() const		{ return m_depthBufferFormat; }
 
@@ -68,6 +73,20 @@ namespace DX
 			return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 		}
 
+		bool											m_deviceRemoved;
+		UINT											m_currentFrame;
+
+		// CPU/GPU Synchronization.
+		Microsoft::WRL::ComPtr<ID3D12Fence>				m_fence;
+		UINT64											m_fenceValues[c_frameCount];
+		HANDLE											m_fenceEvent;
+
+		UINT64											m_videoFenceValue;
+
+		Microsoft::WRL::ComPtr<IDXGISwapChain3>			m_swapChain;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_commandQueue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_videoQueue;
+
 	private:
 		void CreateDeviceIndependentResources();
 		void CreateDeviceResources();
@@ -75,12 +94,10 @@ namespace DX
 		void MoveToNextFrame();
 		void GetHardwareAdapter(IDXGIAdapter1** ppAdapter);
 
-		UINT											m_currentFrame;
 
 		// Direct3D objects.
 		Microsoft::WRL::ComPtr<ID3D12Device>			m_d3dDevice;
 		Microsoft::WRL::ComPtr<IDXGIFactory4>			m_dxgiFactory;
-		Microsoft::WRL::ComPtr<IDXGISwapChain3>			m_swapChain;
 
 		Microsoft::WRL::ComPtr<ID3D12Resource>			m_intermediateRenderTarget;
 		Microsoft::WRL::ComPtr<ID3D12Resource>			m_swapChainRenderTargets[c_frameCount];
@@ -88,9 +105,10 @@ namespace DX
 		Microsoft::WRL::ComPtr<ID3D12Resource>			m_depthStencil;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_rtvHeap;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_dsvHeap;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue>		m_commandQueue;
+
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>	m_commandAllocators[c_frameCount];
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator>  m_videoEncodeCommandAllocator;
+
 		DXGI_FORMAT										m_backBufferFormat;
 		DXGI_FORMAT										m_depthBufferFormat;
 
@@ -98,12 +116,7 @@ namespace DX
 		D3D12_VIEWPORT									m_pass2Viewport;
 		
 		UINT											m_rtvDescriptorSize;
-		bool											m_deviceRemoved;
 
-		// CPU/GPU Synchronization.
-		Microsoft::WRL::ComPtr<ID3D12Fence>				m_fence;
-		UINT64											m_fenceValues[c_frameCount];
-		HANDLE											m_fenceEvent;
 
 		// Cached reference to the Window.
 		HWND											m_window;

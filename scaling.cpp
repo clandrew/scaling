@@ -74,10 +74,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		g_spinningCubeMain.Update();
 
-		if (g_spinningCubeMain.Render())
-		{
-			GetDeviceResources()->Present();
-		}
+        g_spinningCubeMain.RenderAndPresent();
 	}
 
 	g_deviceResources->WaitForGpu();

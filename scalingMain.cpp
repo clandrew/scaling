@@ -39,7 +39,7 @@ void scalingMain::Update()
 
 // Renders the current frame according to the current application state.
 // Returns true if the frame was rendered and is ready to be displayed.
-bool scalingMain::Render()
+bool scalingMain::RenderAndPresent()
 {
 	// Don't try to render anything before the first Update.
 	if (m_timer.GetFrameCount() == 0)
@@ -49,7 +49,7 @@ bool scalingMain::Render()
 
 	// Render the scene objects.
 	// TODO: Replace this with your app's content rendering functions.
-	return m_sceneRenderer->Render();
+	return m_sceneRenderer->RenderAndPresent();
 }
 
 // Updates application state when the window's size changes (e.g. device orientation change)

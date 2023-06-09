@@ -69,7 +69,8 @@ DX::DeviceResources::DeviceResources(DXGI_FORMAT backBufferFormat, DXGI_FORMAT d
 	m_backBufferFormat(backBufferFormat),
 	m_depthBufferFormat(depthBufferFormat),
 	m_fenceValues{},
-	m_deviceRemoved(false)
+	m_deviceRemoved(false),
+	m_videoFenceValue(0)
 {
 	CreateDeviceIndependentResources();
 	CreateDeviceResources();
@@ -124,12 +125,22 @@ void DX::DeviceResources::CreateDeviceResources()
 	DX::ThrowIfFailed(hr);
 
 	// Create the command queue.
-	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	{
+		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-	DX::ThrowIfFailed(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
-	NAME_D3D12_OBJECT(m_commandQueue);
+		DX::ThrowIfFailed(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+		NAME_D3D12_OBJECT(m_commandQueue);
+	}
+	{
+		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE;
+
+		DX::ThrowIfFailed(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_videoQueue)));
+		NAME_D3D12_OBJECT(m_videoQueue);
+	}
 
 	// Create descriptor heaps for render target views and depth stencil views.
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
@@ -154,6 +165,10 @@ void DX::DeviceResources::CreateDeviceResources()
 			m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n]))
 			);
 	}
+
+	DX::ThrowIfFailed(
+		m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, IID_PPV_ARGS(&m_videoEncodeCommandAllocator))
+	);
 
 	// Create synchronization objects.
 	DX::ThrowIfFailed(m_d3dDevice->CreateFence(m_fenceValues[m_currentFrame], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -391,6 +406,20 @@ void DX::DeviceResources::WaitForGpu()
 
 	// Increment the fence value for the current frame.
 	m_fenceValues[m_currentFrame]++;
+}
+
+// Wait for pending GPU work to complete.
+void DX::DeviceResources::WaitForVideo()
+{
+	// Schedule a Signal command in the queue.
+	DX::ThrowIfFailed(m_videoQueue->Signal(m_fence.Get(), m_videoFenceValue));
+
+	// Wait until the fence has been crossed.
+	DX::ThrowIfFailed(m_fence->SetEventOnCompletion(m_videoFenceValue, m_fenceEvent));
+	WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
+
+	// Increment the fence value for the current frame.
+	m_videoFenceValue++;
 }
 
 // Prepare to render the next frame.

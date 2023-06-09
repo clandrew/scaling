@@ -50,10 +50,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	auto d3dDevice = m_deviceResources->GetD3DDevice();
 
 	// Create command lists
-	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetDirectCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 	NAME_D3D12_OBJECT(m_commandList);
 
-	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, m_deviceResources->GetCommandAllocator(), nullptr, IID_PPV_ARGS(&m_videoEncodeCommandList)));
+	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, m_deviceResources->GetVideoEncodeCommandAllocator(), nullptr, IID_PPV_ARGS(&m_videoEncodeCommandList)));
 	NAME_D3D12_OBJECT(m_videoEncodeCommandList);
 
 	bool motionEstimationSupported = false;
@@ -170,9 +170,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			&defaultHeapType,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE,
+			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(&m_motionVectors)));
+		DX::SetName(m_motionVectors.Get(), L"m_motionVectors");
 	}
 	{
 		D3D12_RESOURCE_DESC resourceDesc{};
@@ -196,19 +197,19 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			&defaultHeapType,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(&m_currentYuv)));
-		DX::SetName(m_currentYuv.Get(), L"m_yuv");
+		DX::SetName(m_currentYuv.Get(), L"m_currentYuv");
 
 		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
 			&defaultHeapType,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
 			IID_PPV_ARGS(&m_previousYuv)));
-		DX::SetName(m_currentYuv.Get(), L"m_previousYuv");
+		DX::SetName(m_previousYuv.Get(), L"m_previousYuv");
 	}
 
 	DX::ThrowIfNGXFailed(Status);
@@ -684,6 +685,8 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
 		m_deviceResources->WaitForGpu();
+
+		DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
 	};
 
 	m_loadingComplete = true;
@@ -753,7 +756,7 @@ void Sample3DSceneRenderer::Rotate(float radians)
 }
 
 // Renders one frame using the vertex and pixel shaders.
-bool Sample3DSceneRenderer::Render()
+bool Sample3DSceneRenderer::RenderAndPresent()
 {
 	// Loading is asynchronous. Only draw geometry after it's loaded.
 	if (!m_loadingComplete)
@@ -761,10 +764,10 @@ bool Sample3DSceneRenderer::Render()
 		return false;
 	}
 
-	DX::ThrowIfFailed(m_deviceResources->GetCommandAllocator()->Reset());
+	DX::ThrowIfFailed(m_deviceResources->GetDirectCommandAllocator()->Reset());
 
 	// The command list can be reset anytime after ExecuteCommandList() is called.
-	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetCommandAllocator(), nullptr));
+	DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetDirectCommandAllocator(), nullptr));
 
 	ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap.Get() };
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
@@ -859,6 +862,14 @@ bool Sample3DSceneRenderer::Render()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
+
+		DX::ThrowIfFailed(m_commandList->Close());
+
+		// Execute the command list.
+		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+		m_deviceResources->Present();
 	}
 	else
 	{
@@ -869,7 +880,11 @@ bool Sample3DSceneRenderer::Render()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
-
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
 
 		// Convert Rgb to Yuv because motion estimation requires yuv
 		{
@@ -885,6 +900,44 @@ bool Sample3DSceneRenderer::Render()
 			UINT dispatchY = g_scaling_sourceHeight;
 			m_commandList->Dispatch(dispatchX, dispatchY, 1);
 		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		DX::ThrowIfFailed(m_commandList->Close());
+
+		{
+			ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+			m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		}
+
+		m_deviceResources->WaitForGpu(); // Wait for graphics conversion to finish
+
+		DX::ThrowIfFailed(m_deviceResources->GetVideoEncodeCommandAllocator()->Reset());
+		DX::ThrowIfFailed(m_videoEncodeCommandList->Reset(m_deviceResources->GetVideoEncodeCommandAllocator()));
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
 
 		// Run motion estimation
 		{
@@ -898,8 +951,55 @@ bool Sample3DSceneRenderer::Render()
 
 			const D3D12_VIDEO_MOTION_ESTIMATOR_OUTPUT outputArgs = { m_videoMotionVectorHeap.Get() };
 
-			//m_commandList->EstimateMotion(m_videoMotionEstimator.Get(), &outputArgs, &inputArgs);
+			m_videoEncodeCommandList->EstimateMotion(m_videoMotionEstimator.Get(), &outputArgs, &inputArgs);
 		}
+		// Resolve motion vectors
+		{
+			D3D12_RESOLVE_VIDEO_MOTION_VECTOR_HEAP_INPUT inputArgs =
+			{
+				m_videoMotionVectorHeap.Get(),
+				g_scaling_sourceWidth,
+				g_scaling_sourceHeight
+			};
+
+			D3D12_RESOURCE_COORDINATE ouputCoordinate{};
+
+			D3D12_RESOLVE_VIDEO_MOTION_VECTOR_HEAP_OUTPUT outputArgs =
+			{
+				m_motionVectors.Get(),
+				ouputCoordinate
+			};
+
+			m_videoEncodeCommandList->ResolveMotionVectorHeap(&outputArgs, &inputArgs);
+		}
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_previousYuv.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_currentYuv.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_READ, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE, D3D12_RESOURCE_STATE_COMMON);
+			m_videoEncodeCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
+
+		{
+			ID3D12CommandList* ppCommandLists[] = { m_videoEncodeCommandList.Get() };
+			m_deviceResources->GetVideoQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		}
+		m_deviceResources->WaitForVideo();
+
+		// Reopen the graphics command list
+		DX::ThrowIfFailed(m_deviceResources->GetDirectCommandAllocator()->Reset());
+		DX::ThrowIfFailed(m_commandList->Reset(m_deviceResources->GetDirectCommandAllocator(), nullptr));
 
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
@@ -947,13 +1047,46 @@ bool Sample3DSceneRenderer::Render()
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
+
+		DX::ThrowIfFailed(m_commandList->Close());
+
+		// Execute the command list.
+		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+		// The first argument instructs DXGI to block until VSync, putting the application
+		// to sleep until the next VSync. This ensures we don't waste any cycles rendering
+		// frames that will never be displayed to the screen.
+		HRESULT hr = m_deviceResources->GetSwapChain()->Present(1, 0);
+
+		// If the device was removed either by a disconnection or a driver upgrade, we 
+		// must recreate all device resources.
+		if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+		{
+			m_deviceResources->m_deviceRemoved = true;
+		}
+		else
+		{
+			DX::ThrowIfFailed(hr);
+
+			// Schedule a Signal command in the queue.
+			const UINT64 currentFenceValue = m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame];
+			DX::ThrowIfFailed(m_deviceResources->m_commandQueue->Signal(m_deviceResources->m_fence.Get(), currentFenceValue));
+
+			// Advance the frame index.
+			m_deviceResources->m_currentFrame = m_deviceResources->m_swapChain->GetCurrentBackBufferIndex();
+
+			// Check to see if the next frame is ready to start.
+			if (m_deviceResources->m_fence->GetCompletedValue() < m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame])
+			{
+				DX::ThrowIfFailed(m_deviceResources->m_fence->SetEventOnCompletion(m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame], m_deviceResources->m_fenceEvent));
+				WaitForSingleObjectEx(m_deviceResources->m_fenceEvent, INFINITE, FALSE);
+			}
+
+			// Set the fence value for the next frame.
+			m_deviceResources->m_fenceValues[m_deviceResources->m_currentFrame] = currentFenceValue + 1;
+		}
 	}
-
-	DX::ThrowIfFailed(m_commandList->Close());
-
-	// Execute the command list.
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-	m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	return true;
 }

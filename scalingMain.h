@@ -13,7 +13,7 @@ namespace scaling
 		scalingMain();
 		void CreateRenderers(const std::shared_ptr<DX::DeviceResources>& deviceResources);
 		void Update();
-		bool Render();
+		bool RenderAndPresent();
 		void OnPressSpaceKey();
 		void OnPressLeftKey();
 		void OnPressRightKey();
