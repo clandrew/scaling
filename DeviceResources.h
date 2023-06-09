@@ -78,7 +78,14 @@ namespace DX
 		void CreateDeviceResources();
 		void CreateTargetSizeDependentResources();
 		void MoveToNextFrame();
-		void GetHardwareAdapter(IDXGIAdapter1** ppAdapter);
+
+		enum class AdapterType
+		{
+			Hardware,
+			Software
+		};
+
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> GetAdapter(AdapterType type);
 		void WaitForGpuImpl(ID3D12CommandQueue* pQueue);
 
 

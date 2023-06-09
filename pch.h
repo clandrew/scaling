@@ -29,4 +29,6 @@
 #include "nvsdk_ngx.h"
 #include "nvsdk_ngx_helpers.h"
 
+#include "xess_d3d12.h"
+
 #endif //PCH_H

@@ -19,6 +19,14 @@ namespace DX
 		}
 	}
 
+	inline void ThrowIfXeSSFailed(xess_result_t status)
+	{
+		if (status != XESS_RESULT_SUCCESS)
+		{
+			_com_issue_error(E_FAIL);
+		}
+	}
+
 	inline std::vector<byte> ReadData(const std::wstring& filename)
 	{
 		std::vector<byte> result;

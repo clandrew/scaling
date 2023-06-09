@@ -11,6 +11,7 @@ namespace scaling
 		Point,
 		Linear,
 		DLSS,
+		XeSS,
 		NumScalingTypes
 	};
 
@@ -76,20 +77,24 @@ namespace scaling
 		ScalingType m_scalingType;
 		bool m_isSpinning;
 
-		// DLSS-related things
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_upscaledTarget;
 		Microsoft::WRL::ComPtr<ID3D12VideoEncodeCommandList> m_videoEncodeCommandList;
 		Microsoft::WRL::ComPtr<ID3D12VideoMotionEstimator>   m_videoMotionEstimator;
 		Microsoft::WRL::ComPtr<ID3D12VideoMotionVectorHeap>  m_videoMotionVectorHeap;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState>		     m_pass2_YuvConversion_PipelineState;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_motionVectors;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_currentYuv;
+		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_previousYuv;
+
+		// DLSS-related things
 		bool                                                 m_dlssSupported;
 		NVSDK_NGX_Parameter*                                 m_ngxParameters{};
 		NVSDK_NGX_Handle*                                    m_dlssFeatureHandle;
 		float                                                m_dlssSharpness;
 		int												     m_dlssReset;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_motionVectors;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_currentYuv;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_previousYuv;
-		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_dlssTarget;
+
+		// XeSS-related things
+		xess_context_handle_t								 m_xessContext = nullptr;
 	};
 }
 

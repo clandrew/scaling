@@ -91,15 +91,14 @@ void DX::DeviceResources::CreateDeviceResources()
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
-			debugController->SetEnableGPUBasedValidation(TRUE);
+			//debugController->SetEnableGPUBasedValidation(TRUE);
 		}
 	}
 #endif
 
 	DX::ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
 
-	ComPtr<IDXGIAdapter1> adapter;
-	GetHardwareAdapter(&adapter);
+	ComPtr<IDXGIAdapter1> adapter = GetAdapter(AdapterType::Software);
 
 	// Create the Direct3D 12 API device object
 	HRESULT hr = D3D12CreateDevice(
@@ -133,6 +132,8 @@ void DX::DeviceResources::CreateDeviceResources()
 		DX::ThrowIfFailed(m_d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 		NAME_D3D12_OBJECT(m_commandQueue);
 	}
+
+	if (m_videoQueue)
 	{
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -166,9 +167,12 @@ void DX::DeviceResources::CreateDeviceResources()
 			);
 	}
 
-	DX::ThrowIfFailed(
-		m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, IID_PPV_ARGS(&m_videoEncodeCommandAllocator))
-	);
+	if (m_videoQueue)
+	{
+		DX::ThrowIfFailed(
+			m_d3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, IID_PPV_ARGS(&m_videoEncodeCommandAllocator))
+		);
+	}
 
 	// Create synchronization objects.
 	DX::ThrowIfFailed(m_d3dDevice->CreateFence(m_fenceValues[m_currentFrame], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -442,29 +446,31 @@ void DX::DeviceResources::MoveToNextFrame()
 
 // This method acquires the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
-void DX::DeviceResources::GetHardwareAdapter(IDXGIAdapter1** ppAdapter)
+ComPtr<IDXGIAdapter1> DX::DeviceResources::GetAdapter(AdapterType type)
 {
 	ComPtr<IDXGIAdapter1> adapter;
-	*ppAdapter = nullptr;
 
 	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != m_dxgiFactory->EnumAdapters1(adapterIndex, &adapter); adapterIndex++)
 	{
 		DXGI_ADAPTER_DESC1 desc;
 		adapter->GetDesc1(&desc);
 
-		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE && type == AdapterType::Software)
 		{
-			// Don't select the Basic Render Driver adapter.
-			continue;
+			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+			{
+				return adapter;
+			}
 		}
 
-		// Check to see if the adapter supports Direct3D 12, but don't create the
-		// actual device yet.
-		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+		if (!(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) && type == AdapterType::Hardware)
 		{
-			break;
+			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+			{
+				return adapter;
+			}
 		}
 	}
 
-	*ppAdapter = adapter.Detach();
+	return adapter;
 }

@@ -25,7 +25,7 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_tracking(false),
 	m_mappedConstantBuffer(nullptr),
 	m_deviceResources(deviceResources),
-	m_scalingType(ScalingType::DLSS),
+	m_scalingType(ScalingType::XeSS),
 	m_isSpinning(true),
 	m_dlssSupported(false),
 	m_dlssSharpness(1.0f),
@@ -53,8 +53,11 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetDirectCommandAllocator(), m_pass1PipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 	NAME_D3D12_OBJECT(m_commandList);
 
-	DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, m_deviceResources->GetVideoEncodeCommandAllocator(), nullptr, IID_PPV_ARGS(&m_videoEncodeCommandList)));
-	NAME_D3D12_OBJECT(m_videoEncodeCommandList);
+	if (m_deviceResources->GetVideoQueue())
+	{
+		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE, m_deviceResources->GetVideoEncodeCommandAllocator(), nullptr, IID_PPV_ARGS(&m_videoEncodeCommandList)));
+		NAME_D3D12_OBJECT(m_videoEncodeCommandList);
+	}
 
 	bool motionEstimationSupported = false;
 	ComPtr<ID3D12VideoDevice1> videoDevice;
@@ -67,19 +70,19 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		}
 	}
 
-	NVSDK_NGX_Result Status{};
-
 	if (motionEstimationSupported)
 	{
-		NVSDK_NGX_Result Status = NVSDK_NGX_D3D12_Init(12341234, L"./", d3dDevice);
-		DX::ThrowIfNGXFailed(Status);
+		NVSDK_NGX_Result ngxResult{};
 
-		Status = NVSDK_NGX_D3D12_GetCapabilityParameters(&m_ngxParameters);
-		DX::ThrowIfNGXFailed(Status);
+		ngxResult = NVSDK_NGX_D3D12_Init(12341234, L"./", d3dDevice);
+		DX::ThrowIfNGXFailed(ngxResult);
+
+		ngxResult = NVSDK_NGX_D3D12_GetCapabilityParameters(&m_ngxParameters);
+		DX::ThrowIfNGXFailed(ngxResult);
 
 		int DLSSAvailable = 0;
-		Status = m_ngxParameters->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &DLSSAvailable);
-		DX::ThrowIfNGXFailed(Status);
+		ngxResult = m_ngxParameters->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &DLSSAvailable);
+		DX::ThrowIfNGXFailed(ngxResult);
 		m_dlssSupported = DLSSAvailable > 0;
 
 		{
@@ -95,7 +98,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 			UINT creationNodeMask = 1;
 			UINT visibilityNodeMask = 1;
-			Status = NGX_D3D12_CREATE_DLSS_EXT(
+			ngxResult = NGX_D3D12_CREATE_DLSS_EXT(
 				m_commandList.Get(),
 				creationNodeMask,
 				visibilityNodeMask,
@@ -103,7 +106,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 				m_ngxParameters,
 				&dlssCreateParams);
 
-			DX::ThrowIfNGXFailed(Status);
+			DX::ThrowIfNGXFailed(ngxResult);
 		}
 
 		D3D12_VIDEO_MOTION_ESTIMATOR_DESC motionEstimatorDesc = {
@@ -133,6 +136,63 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			IID_PPV_ARGS(&m_videoMotionVectorHeap));
 	}
 
+	xess_result_t xessResult;
+
+	xessResult = xessD3D12CreateContext(d3dDevice, &m_xessContext);
+	DX::ThrowIfXeSSFailed(xessResult);
+
+	if (XESS_RESULT_WARNING_OLD_DRIVER == xessIsOptimalDriver(m_xessContext))
+	{
+		OutputDebugStringW(L"Please install the latest graphics driver from your vendor for optimal Intel(R) XeSS performance and visual quality");
+	}
+
+	xess_2d_t desiredOutputResolution;
+	desiredOutputResolution.x = g_scaling_destWidth;
+	desiredOutputResolution.y = g_scaling_destHeight;
+
+	xess_properties_t props;
+	xessResult = xessGetProperties(m_xessContext, &desiredOutputResolution, &props);
+	DX::ThrowIfXeSSFailed(xessResult);
+
+	xess_version_t xefx_version;
+	xessResult = xessGetIntelXeFXVersion(m_xessContext, &xefx_version);
+	DX::ThrowIfXeSSFailed(xessResult);
+
+	const xess_quality_settings_t quality = XESS_QUALITY_SETTING_ULTRA_QUALITY;
+
+	xess_d3d12_init_params_t params = {
+		
+		desiredOutputResolution, /* Output width and height. */
+		
+		quality, /* Quality setting */
+
+		XESS_INIT_FLAG_NONE, // Use motion vectors at source resolution
+
+		/* Specfies the node mask for internally created resources on
+		 * multi-adapter systems. */
+		0,
+		/* Specfies the node visibility mask for internally created resources
+		 * on multi-adapter systems. */
+		0,
+		/* Optional externally allocated buffers storage for X<sup>e</sup>SS. If NULL the
+		 * storage is allocated internally. If allocated, the heap type must be
+		 * D3D12_HEAP_TYPE_DEFAULT. This heap is not accessed by the CPU. */
+		nullptr,
+		/* Offset in the externally allocated heap for temporary buffers storage. */
+		0,
+		/* Optional externally allocated textures storage for X<sup>e</sup>SS. If NULL the
+		 * storage is allocated internally. If allocated, the heap type must be
+		 * D3D12_HEAP_TYPE_DEFAULT. This heap is not accessed by the CPU. */
+		nullptr,
+		/* Offset in the externally allocated heap for temporary textures storage. */
+		0,
+		/* No pipeline library */
+		NULL
+	};
+
+	xessResult = xessD3D12Init(m_xessContext, &params);
+	DX::ThrowIfXeSSFailed(xessResult);
+
 	{
 		D3D12_RESOURCE_DESC resourceDesc{};
 		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -152,7 +212,8 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_COPY_SOURCE,
 			nullptr,
-			IID_PPV_ARGS(&m_dlssTarget)));
+			IID_PPV_ARGS(&m_upscaledTarget)));
+		DX::SetName(m_upscaledTarget.Get(), L"m_upscaledTarget");
 	}
 	{
 		D3D12_RESOURCE_DESC resourceDesc{};
@@ -211,8 +272,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			IID_PPV_ARGS(&m_previousYuv)));
 		DX::SetName(m_previousYuv.Get(), L"m_previousYuv");
 	}
-
-	DX::ThrowIfNGXFailed(Status);
 
 	// Graphics root sig
 	{
@@ -686,7 +745,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
 		m_deviceResources->WaitForGpuOnDirectQueue();
 
-		DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
+		if (m_videoEncodeCommandList)
+		{
+			DX::ThrowIfFailed(m_videoEncodeCommandList->Close());
+		}
 	};
 
 	m_loadingComplete = true;
@@ -870,10 +932,8 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		m_deviceResources->Present();
 	}
-	else
+	else if (m_scalingType == ScalingType::DLSS)
 	{
-		assert(m_scalingType == ScalingType::DLSS);
-
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
@@ -1002,7 +1062,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_dlssTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
@@ -1010,7 +1070,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
 		dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
-		dlssEvalParams.Feature.pInOutput = m_dlssTarget.Get(); // Looks like you can't upscale directly to a swapchain target.
+		dlssEvalParams.Feature.pInOutput = m_upscaledTarget.Get(); // Looks like you can't upscale directly to a swapchain target.
 		dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
 		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
 		dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
@@ -1035,11 +1095,11 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_dlssTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
-		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_dlssTarget.Get());
+		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_upscaledTarget.Get());
 
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
@@ -1079,6 +1139,84 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		m_deviceResources->Present();
 	}
+	else
+	{
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		assert(m_scalingType == ScalingType::XeSS);
+		xess_d3d12_execute_params_t exec_params{};
+		exec_params.inputWidth = g_scaling_sourceWidth;
+		exec_params.inputHeight = g_scaling_sourceHeight;
+		exec_params.jitterOffsetX = 0;
+		exec_params.jitterOffsetY = 0;
+		exec_params.exposureScale = 1.0f;
+		exec_params.pColorTexture = m_deviceResources->GetIntermediateRenderTarget();
+		exec_params.pVelocityTexture = m_motionVectors.Get();
+		exec_params.pOutputTexture = m_upscaledTarget.Get();
+		exec_params.pDepthTexture = m_deviceResources->GetDepthStencil();
+		exec_params.pExposureScaleTexture = 0;
+		xess_result_t status = xessD3D12Execute(m_xessContext, m_commandList.Get(), &exec_params);
+		DX::ThrowIfXeSSFailed(status);
+
+		// Copy to target
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_upscaledTarget.Get());
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		// Set things up for the next frame
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+		{
+			CD3DX12_RESOURCE_BARRIER barrier =
+				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+			m_commandList->ResourceBarrier(1, &barrier);
+		}
+
+		DX::ThrowIfFailed(m_commandList->Close());
+
+		// Execute the command list.
+		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+		m_deviceResources->GetCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+		m_deviceResources->Present();
+	}
 
 	return true;
 }
@@ -1091,6 +1229,7 @@ void Sample3DSceneRenderer::UpdateWindowTitleText()
 	case ScalingType::Point: titleText = L"Scaling type: Point"; break;
 	case ScalingType::Linear: titleText = L"Scaling type: Linear"; break;
 	case ScalingType::DLSS: titleText = L"Scaling type: DLSS"; break;
+	case ScalingType::XeSS: titleText = L"Scaling type: XeSS"; break;
 	default:
 		assert(false);
 		titleText = L"Scaling type: <error>";
