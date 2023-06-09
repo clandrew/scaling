@@ -98,7 +98,7 @@ void DX::DeviceResources::CreateDeviceResources()
 
 	DX::ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
 
-	ComPtr<IDXGIAdapter1> adapter = GetAdapter(AdapterType::Software);
+	ComPtr<IDXGIAdapter1> adapter = GetAdapter(AdapterType::Hardware);
 
 	// Create the Direct3D 12 API device object
 	HRESULT hr = D3D12CreateDevice(
@@ -133,7 +133,7 @@ void DX::DeviceResources::CreateDeviceResources()
 		NAME_D3D12_OBJECT(m_commandQueue);
 	}
 
-	if (m_videoQueue)
+	// TODO: Check cap
 	{
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
