@@ -158,7 +158,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	xessResult = xessGetIntelXeFXVersion(m_xessContext, &xefx_version);
 	DX::ThrowIfXeSSFailed(xessResult);
 
-	const xess_quality_settings_t quality = XESS_QUALITY_SETTING_ULTRA_QUALITY;
+	const xess_quality_settings_t quality = XESS_QUALITY_SETTING_PERFORMANCE;
+
+	desiredOutputResolution.x = g_scaling_destWidth;
+	desiredOutputResolution.y = g_scaling_destHeight;
 
 	xess_d3d12_init_params_t params = {
 		
@@ -191,6 +194,12 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 	};
 
 	xessResult = xessD3D12Init(m_xessContext, &params);
+	DX::ThrowIfXeSSFailed(xessResult);
+
+	// Get optimal input resolution
+	xess_2d_t recommendedInputResolution;
+	xessResult = xessGetInputResolution(
+		m_xessContext, &desiredOutputResolution, quality, &recommendedInputResolution);
 	DX::ThrowIfXeSSFailed(xessResult);
 
 	{

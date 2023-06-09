@@ -14,8 +14,8 @@ scaling::scalingMain g_spinningCubeMain;
 HWND g_hwnd{};
 bool g_done = false;
 
-int g_scaling_sourceWidth = 320;
-int g_scaling_sourceHeight = 240;
+int g_scaling_sourceWidth = 512;
+int g_scaling_sourceHeight = 384;
 
 int g_scaling_destWidth = 1024;
 int g_scaling_destHeight = 768;
