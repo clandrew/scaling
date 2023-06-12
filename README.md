@@ -12,14 +12,11 @@ It's for my own quick testing purposes. The geometry is really simple- a spinnin
 
 This application is useful for sample code for setting up these APIs, and you can use it to do some quick visual comparisons, e.g.:
 
-Point sampling:
-![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Point.png "Example image.")
-
-Linear sampling:
-![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Linear.png "Example image.")
-
-Upscaled:
-![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Upscaled.png "Example image.")
+| Option  | Result |
+| ------------- | ------------- |
+| Point sampling  | ![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Point.png "Example image.")  |
+| Linear sampling  | ![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Linear.png "Example image.")  |
+| Upscaled  | ![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Upscaled.png "Example image.")  |
 
 ## Controls
 
