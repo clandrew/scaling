@@ -10,6 +10,17 @@ It's for my own quick testing purposes. The geometry is really simple- a spinnin
 
 ![Example image](https://raw.githubusercontent.com/clandrew/spinningcube12/master/Images/Image.gif "Example image.")
 
+This application is useful for sample code for setting up these APIs, and you can use it to do some quick visual comparisons, e.g.:
+
+Point sampling:
+![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Point.png "Example image.")
+
+Linear sampling:
+![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Linear.png "Example image.")
+
+Upscaled:
+![Example image](https://raw.githubusercontent.com/clandrew/scaling/main/Images/Upscaled.png "Example image.")
+
 ## Controls
 
 * **Left and right keys**: Selects between the four rendering options, where the current one appears in the title bar
