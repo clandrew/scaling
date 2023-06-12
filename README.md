@@ -10,7 +10,17 @@ It's for my own quick testing purposes. The geometry is really simple- a spinnin
 
 ![Example image](https://raw.githubusercontent.com/clandrew/spinningcube12/master/Images/Image.gif "Example image.")
 
+## Controls
+
+* **Left and right keys**: Selects between the four rendering options, where the current one appears in the title bar
+  * Point sampling
+  * Linear Sampling
+  * DLSS
+  * XeSS
+* **Space**: Toggles the spinning animation of the cube.
+* **'U' key**: Toggles updating of the AI evaluation buffer. Only applicable to DLSS and XeSS above. 
+
 ## Build
 The source code is organized as a Visual Studio 2019 built for x86-64 architecture. It uses the v142 toolset.
 
-Shaders are compiled at build time as part of the solution against shader model 6_0. This shader model isn't necessary, I set it so that it's a default which is more useful for me. If you want, you can set it to shader model 4 level 9_3.
+Shaders are compiled at build time as part of the solution against shader model 6_0. 
