@@ -1,11 +1,12 @@
-# Spinning Cube Sample (D3D12, Win32)
+# Scaling toy application
 
-This is quick-and-dirty sample code based off of the sample "DirectX 12 App (Universal Windows)" which comes built-in with Visual Studio 2017 when the UWP and C++ features are installed. I needed to test some things specific to Win32 so I adapted that sample to be a Win32 program. I'm putting it here in case other people encounter the same situation.
+This is a quick test application for demoing setting up two types of AI-based upscaling:
+* [NVIDIA DLSS](https://developer.nvidia.com/rtx/dlss/get-started)
+* [Intel XeSS](https://github.com/intel/xess/releases/tag/v1.1.0)
 
-In the interest of simplicity, the following things were removed from the original sample:
-* Monitor-rotation-change handling
-* DPI-change handling
-* Saving and restoring of persistant state
+using the respective public SDKs linked above.
+
+It's for my own quick testing purposes. The geometry is really simple- a spinning cube. It uses video motion estimation to apply motion vectors.
 
 ![Example image](https://raw.githubusercontent.com/clandrew/spinningcube12/master/Images/Image.gif "Example image.")
 
