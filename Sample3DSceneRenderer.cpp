@@ -1112,48 +1112,52 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 	{
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
-		EvaluateMotionVectors();
-
+		if (m_isUpdating)
 		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			m_commandList->ResourceBarrier(1, &barrier);
+			EvaluateMotionVectors();
+
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+
+			NVSDK_NGX_Result Status{};
+
+			NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
+			dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
+			dlssEvalParams.Feature.pInOutput = m_upscaledTarget.Get(); // Looks like you can't upscale directly to a swapchain target.
+			dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
+			dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
+			dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
+			dlssEvalParams.pInExposureTexture = nullptr;
+			dlssEvalParams.pInBiasCurrentColorMask = nullptr;
+			dlssEvalParams.InJitterOffsetX = 0;
+			dlssEvalParams.InJitterOffsetY = 0;
+			dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
+			dlssEvalParams.InReset = m_dlssReset;
+			dlssEvalParams.InMVScaleX = 1.0f;
+			dlssEvalParams.InMVScaleY = 1.0f;
+			dlssEvalParams.InRenderSubrectDimensions.Width = g_scaling_sourceWidth;
+			dlssEvalParams.InRenderSubrectDimensions.Height = g_scaling_sourceHeight;
+
+			Status = NGX_D3D12_EVALUATE_DLSS_EXT(
+				m_commandList.Get(),
+				m_dlssFeatureHandle,
+				m_ngxParameters,
+				&dlssEvalParams);
+
+			DX::ThrowIfNGXFailed(Status);
+
+			CopyUpscaledTargetToSwapchain();
+
+			CopyCurrentMotionVectorsToPrevious();
 		}
 
-		NVSDK_NGX_Result Status{};
-
-		NVSDK_NGX_D3D12_DLSS_Eval_Params dlssEvalParams{};
-		dlssEvalParams.Feature.pInColor = m_deviceResources->GetIntermediateRenderTarget();
-		dlssEvalParams.Feature.pInOutput = m_upscaledTarget.Get(); // Looks like you can't upscale directly to a swapchain target.
-		dlssEvalParams.pInDepth = m_deviceResources->GetDepthStencil();
-		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
-		dlssEvalParams.pInMotionVectors = m_motionVectors.Get();
-		dlssEvalParams.pInExposureTexture = nullptr;
-		dlssEvalParams.pInBiasCurrentColorMask = nullptr;
-		dlssEvalParams.InJitterOffsetX = 0;
-		dlssEvalParams.InJitterOffsetY = 0;
-		dlssEvalParams.Feature.InSharpness = m_dlssSharpness;
-		dlssEvalParams.InReset = m_dlssReset;
-		dlssEvalParams.InMVScaleX = 1.0f;
-		dlssEvalParams.InMVScaleY = 1.0f;
-		dlssEvalParams.InRenderSubrectDimensions.Width = g_scaling_sourceWidth;
-		dlssEvalParams.InRenderSubrectDimensions.Height = g_scaling_sourceHeight;
-
-		Status = NGX_D3D12_EVALUATE_DLSS_EXT(
-			m_commandList.Get(),
-			m_dlssFeatureHandle,
-			m_ngxParameters,
-			&dlssEvalParams);
-
-		DX::ThrowIfNGXFailed(Status);
-
-		CopyUpscaledTargetToSwapchain();
-
-		CopyCurrentMotionVectorsToPrevious();
 
 		DX::ThrowIfFailed(m_commandList->Close());
 
@@ -1167,68 +1171,72 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 	{
 		assert(m_scalingType == ScalingType::XeSS);
 
-		EvaluateMotionVectors();
-
-		// For XeSS:
-		//     - It wants source RGB in NON_PIXEL_SHADER_RESOURCE state
-		//     - It cares about depth stencil state
-		//     - It wants motion vectors to be in NON_PIXEL_SHADER_RESOURCE state
-		//     - It wants the target to be in UNORDERED_ACCESS state
-
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
 
-		xess_d3d12_execute_params_t exec_params{};
-		exec_params.inputWidth = g_scaling_sourceWidth;
-		exec_params.inputHeight = g_scaling_sourceHeight;
-		exec_params.jitterOffsetX = 0;
-		exec_params.jitterOffsetY = 0;
-		exec_params.exposureScale = 1.0f;
-		exec_params.pColorTexture = m_deviceResources->GetIntermediateRenderTarget();
-		exec_params.pVelocityTexture = m_motionVectors.Get();
-		exec_params.pOutputTexture = m_upscaledTarget.Get();
-		exec_params.pDepthTexture = m_deviceResources->GetDepthStencil();
-		exec_params.pExposureScaleTexture = 0;
-		xess_result_t status = xessD3D12Execute(m_xessContext, m_commandList.Get(), &exec_params);
-		DX::ThrowIfXeSSFailed(status);
-
-		CopyUpscaledTargetToSwapchain();
-
-		// Set things up for the next frame
+		if (m_isUpdating)
 		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
+			EvaluateMotionVectors();
 
-		CopyCurrentMotionVectorsToPrevious();
+			// For XeSS:
+			//     - It wants source RGB in NON_PIXEL_SHADER_RESOURCE state
+			//     - It cares about depth stencil state
+			//     - It wants motion vectors to be in NON_PIXEL_SHADER_RESOURCE state
+			//     - It wants the target to be in UNORDERED_ACCESS state
+
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+
+			xess_d3d12_execute_params_t exec_params{};
+			exec_params.inputWidth = g_scaling_sourceWidth;
+			exec_params.inputHeight = g_scaling_sourceHeight;
+			exec_params.jitterOffsetX = 0;
+			exec_params.jitterOffsetY = 0;
+			exec_params.exposureScale = 1.0f;
+			exec_params.pColorTexture = m_deviceResources->GetIntermediateRenderTarget();
+			exec_params.pVelocityTexture = m_motionVectors.Get();
+			exec_params.pOutputTexture = m_upscaledTarget.Get();
+			exec_params.pDepthTexture = m_deviceResources->GetDepthStencil();
+			exec_params.pExposureScaleTexture = 0;
+			xess_result_t status = xessD3D12Execute(m_xessContext, m_commandList.Get(), &exec_params);
+			DX::ThrowIfXeSSFailed(status);
+
+			CopyUpscaledTargetToSwapchain();
+
+			// Set things up for the next frame
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetDepthStencil(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+
+			CopyCurrentMotionVectorsToPrevious();
+			{
+				CD3DX12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+				m_commandList->ResourceBarrier(1, &barrier);
+			}
+		}
 
 		{ // It is possible to optimize this out
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_motionVectors.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
 			m_commandList->ResourceBarrier(1, &barrier);
 		}
 
