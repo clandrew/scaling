@@ -34,6 +34,8 @@ namespace scaling
 	private:
 		void Rotate(float radians);
 		void UpdateWindowTitleText();
+		void EvaluateMotionVectors();
+		void CopyCurrentMotionVectorsToPrevious();
 
 	private:
 		// Constant buffers must be 256-byte aligned.
