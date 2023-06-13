@@ -1155,7 +1155,6 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		CopyCurrentMotionVectorsToPrevious();
 
-
 		DX::ThrowIfFailed(m_commandList->Close());
 
 		// Execute the command list.
@@ -1169,6 +1168,12 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 		assert(m_scalingType == ScalingType::XeSS);
 
 		EvaluateMotionVectors();
+
+		// For XeSS:
+		//     - It wants source RGB in NON_PIXEL_SHADER_RESOURCE state
+		//     - It cares about depth stencil state
+		//     - It wants motion vectors to be in NON_PIXEL_SHADER_RESOURCE state
+		//     - It wants the target to be in UNORDERED_ACCESS state
 
 		{
 			CD3DX12_RESOURCE_BARRIER barrier =
@@ -1216,7 +1221,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		CopyCurrentMotionVectorsToPrevious();
 
-		{
+		{ // It is possible to optimize this out
 			CD3DX12_RESOURCE_BARRIER barrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetIntermediateRenderTarget(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_commandList->ResourceBarrier(1, &barrier);
