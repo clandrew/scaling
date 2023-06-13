@@ -31,4 +31,8 @@ This application is useful for sample code for setting up these APIs, and you ca
 ## Build
 The source code is organized as a Visual Studio 2019 built for x86-64 architecture. It uses the v142 toolset.
 
+Important build and execution dependencies:
+* NVIDIA DLSS SDK, linked above
+* Intel XeSS SDK, linked above
+
 Shaders are compiled at build time as part of the solution against shader model 6_0. 
