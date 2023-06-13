@@ -976,6 +976,23 @@ void Sample3DSceneRenderer::CopyCurrentMotionVectorsToPrevious()
 	}
 }
 
+void Sample3DSceneRenderer::CopyUpscaledTargetToSwapchain()
+{
+	{
+		CD3DX12_RESOURCE_BARRIER barrier =
+			CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		m_commandList->ResourceBarrier(1, &barrier);
+	}
+
+	m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_upscaledTarget.Get());
+
+	{
+		CD3DX12_RESOURCE_BARRIER barrier =
+			CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+		m_commandList->ResourceBarrier(1, &barrier);
+	}
+}
+
 // Renders one frame using the vertex and pixel shaders.
 bool Sample3DSceneRenderer::RenderAndPresent()
 {
@@ -1134,19 +1151,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 
 		DX::ThrowIfNGXFailed(Status);
 
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
-
-		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_upscaledTarget.Get());
-
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
+		CopyUpscaledTargetToSwapchain();
 
 		CopyCurrentMotionVectorsToPrevious();
 
@@ -1200,20 +1205,7 @@ bool Sample3DSceneRenderer::RenderAndPresent()
 		xess_result_t status = xessD3D12Execute(m_xessContext, m_commandList.Get(), &exec_params);
 		DX::ThrowIfXeSSFailed(status);
 
-		// Copy to target
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_upscaledTarget.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
-
-		m_commandList->CopyResource(m_deviceResources->GetSwapChainRenderTarget(), m_upscaledTarget.Get());
-
-		{
-			CD3DX12_RESOURCE_BARRIER barrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_deviceResources->GetSwapChainRenderTarget(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-			m_commandList->ResourceBarrier(1, &barrier);
-		}
+		CopyUpscaledTargetToSwapchain();
 
 		// Set things up for the next frame
 		{

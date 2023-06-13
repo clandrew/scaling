@@ -36,6 +36,7 @@ namespace scaling
 		void UpdateWindowTitleText();
 		void EvaluateMotionVectors();
 		void CopyCurrentMotionVectorsToPrevious();
+		void CopyUpscaledTargetToSwapchain();
 
 	private:
 		// Constant buffers must be 256-byte aligned.
