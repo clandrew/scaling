@@ -80,3 +80,8 @@ void scalingMain::OnPressRightKey()
 {
 	return m_sceneRenderer->OnPressRightKey();
 }
+
+void scalingMain::OnPressUKey()
+{
+	return m_sceneRenderer->OnPressUKey();
+}

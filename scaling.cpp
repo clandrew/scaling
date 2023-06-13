@@ -220,6 +220,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 g_spinningCubeMain.OnPressRightKey();
             }
+            else if (wParam == 85)
+            {
+                g_spinningCubeMain.OnPressUKey();
+            }
             break;
         }
     case WM_DESTROY:

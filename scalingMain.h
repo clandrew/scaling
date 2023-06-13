@@ -17,6 +17,7 @@ namespace scaling
 		void OnPressSpaceKey();
 		void OnPressLeftKey();
 		void OnPressRightKey();
+		void OnPressUKey();
 
 		void OnWindowSizeChanged();
 		void OnDeviceRemoved();

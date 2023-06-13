@@ -29,6 +29,7 @@ namespace scaling
 		void OnPressSpaceKey();
 		void OnPressLeftKey();
 		void OnPressRightKey();
+		void OnPressUKey();
 
 	private:
 		void Rotate(float radians);
@@ -76,6 +77,7 @@ namespace scaling
 
 		ScalingType m_scalingType;
 		bool m_isSpinning;
+		bool m_isUpdating;
 
 		Microsoft::WRL::ComPtr<ID3D12Resource>				 m_upscaledTarget;
 		Microsoft::WRL::ComPtr<ID3D12VideoEncodeCommandList> m_videoEncodeCommandList;

@@ -25,8 +25,9 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	m_tracking(false),
 	m_mappedConstantBuffer(nullptr),
 	m_deviceResources(deviceResources),
-	m_scalingType(ScalingType::XeSS),
+	m_scalingType(ScalingType::Point),
 	m_isSpinning(true),
+	m_isUpdating(true),
 	m_dlssSupported(false),
 	m_dlssSharpness(0.5f),
 	m_dlssReset(0)
@@ -1396,6 +1397,11 @@ void Sample3DSceneRenderer::UpdateWindowTitleText()
 void Sample3DSceneRenderer::OnPressSpaceKey()
 {
 	m_isSpinning = !m_isSpinning;
+}
+
+void Sample3DSceneRenderer::OnPressUKey()
+{
+	m_isUpdating = !m_isUpdating;
 }
 
 void Sample3DSceneRenderer::OnPressLeftKey()
