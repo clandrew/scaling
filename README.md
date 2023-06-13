@@ -6,7 +6,7 @@ This is a quick test application for demoing setting up two types of AI-based up
 
 using the respective public SDKs linked above.
 
-It's for my own quick testing purposes. The geometry is really simple- a spinning cube. It uses video motion estimation to apply motion vectors.
+It's for my own quick testing purposes. The geometry is really simple- a spinning cube. It uses video motion estimation to apply motion vectors. It doesn't apply best practices for resource states!
 
 ![Example image](https://raw.githubusercontent.com/clandrew/spinningcube12/master/Images/Image.gif "Example image.")
 
